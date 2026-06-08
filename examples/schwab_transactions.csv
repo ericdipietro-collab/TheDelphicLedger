@@ -1,0 +1,13 @@
+Transactions for account Individual-XXXX
+
+"Date","Action","Symbol","Description","Qty","Price","Fees & Comm","Amount"
+"06/01/2026","Buy","AAPL","Apple Inc","10","187.50","$4.95","-$1,879.95"
+"06/02/2026","Reinvest Shares","MSFT","Microsoft Corp","0.523","415.20","","$0.00"
+"06/03/2026","Dividend","VTI","Vanguard Total Stock Mkt ETF","","","","$48.30"
+"06/04/2026","Sell","BRK/B","Berkshire Hathaway Inc B","5","401.00","$4.95","$2,000.05"
+"06/05/2026","Credit Interest","SPAXX","Schwab Government Money Fund","","","","$3.21"
+"06/06/2026","Transfer of securities in","AAPL","Apple Inc — transferred from external","50","","","$0.00"
+"06/07/2026","Cash Dividend","VTI","Vanguard Total Stock Mkt ETF","","","","$24.15"
+
+Total
+Brokerage services and products: Not FDIC-Insured • No Bank Guarantee • May Lose Value

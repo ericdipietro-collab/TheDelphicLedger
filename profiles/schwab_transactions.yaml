@@ -1,0 +1,14 @@
+column_map:
+  Action: raw_type
+  Amount: amount
+  Date: trade_date
+  Description: name
+  Fees & Comm: fees
+  Price: price
+  Qty: qty
+  Symbol: symbol
+file_type: transactions
+fingerprint: schwab_transactions
+name: Schwab Transactions
+type_aliases:
+  Credit Interest: interest

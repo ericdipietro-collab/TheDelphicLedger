@@ -1,0 +1,74 @@
+{
+  "file_type": "transactions",
+  "broker_fingerprint": "9f4329467c106a77",
+  "template_name": "Schwab Transactions",
+  "row_count": 7,
+  "queued_types": [
+    "Transfer of securities in"
+  ],
+  "rows": [
+    {
+      "instrument": "AAPL",
+      "trade_date": "2026-06-01",
+      "raw_type": "Buy",
+      "canonical_type": "buy",
+      "qty": "10",
+      "price": "187.50",
+      "amount": "-1879.95"
+    },
+    {
+      "instrument": "MSFT",
+      "trade_date": "2026-06-02",
+      "raw_type": "Reinvest Shares",
+      "canonical_type": "reinvest",
+      "qty": "0.523",
+      "price": "415.20",
+      "amount": "0.00"
+    },
+    {
+      "instrument": "VTI",
+      "trade_date": "2026-06-03",
+      "raw_type": "Dividend",
+      "canonical_type": "dividend",
+      "qty": null,
+      "price": null,
+      "amount": "48.30"
+    },
+    {
+      "instrument": "BRK/B",
+      "trade_date": "2026-06-04",
+      "raw_type": "Sell",
+      "canonical_type": "sell",
+      "qty": "5",
+      "price": "401.00",
+      "amount": "2000.05"
+    },
+    {
+      "instrument": "SPAXX",
+      "trade_date": "2026-06-05",
+      "raw_type": "Credit Interest",
+      "canonical_type": "interest",
+      "qty": null,
+      "price": null,
+      "amount": "3.21"
+    },
+    {
+      "instrument": "AAPL",
+      "trade_date": "2026-06-06",
+      "raw_type": "Transfer of securities in",
+      "canonical_type": null,
+      "qty": "50",
+      "price": null,
+      "amount": "0.00"
+    },
+    {
+      "instrument": "VTI",
+      "trade_date": "2026-06-07",
+      "raw_type": "Cash Dividend",
+      "canonical_type": "dividend",
+      "qty": null,
+      "price": null,
+      "amount": "24.15"
+    }
+  ]
+}

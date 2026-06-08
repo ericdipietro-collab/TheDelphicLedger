@@ -1,0 +1,45 @@
+{
+  "file_type": "positions",
+  "broker_fingerprint": "1b281d4e9f01d120",
+  "template_name": "Schwab Positions",
+  "row_count": 4,
+  "queued_types": [],
+  "rows": [
+    {
+      "instrument": "AAPL",
+      "name": "Apple Inc",
+      "qty": "100",
+      "price": "189.30",
+      "cost_basis": "12000.00",
+      "market_value": "18930.00",
+      "as_of": null
+    },
+    {
+      "instrument": "BRK/B",
+      "name": "Berkshire Hathaway Inc B",
+      "qty": "50",
+      "price": "403.50",
+      "cost_basis": "15000.00",
+      "market_value": "20175.00",
+      "as_of": null
+    },
+    {
+      "instrument": "VTI",
+      "name": "Vanguard Total Stock Mkt ETF",
+      "qty": "200",
+      "price": "240.15",
+      "cost_basis": "35000.00",
+      "market_value": "48030.00",
+      "as_of": null
+    },
+    {
+      "instrument": "SPAXX",
+      "name": "Schwab Government Money Fund",
+      "qty": "1000",
+      "price": "1.00",
+      "cost_basis": "1000.00",
+      "market_value": "1000.00",
+      "as_of": null
+    }
+  ]
+}

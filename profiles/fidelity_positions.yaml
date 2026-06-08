@@ -1,0 +1,12 @@
+column_map:
+  Average Cost Basis: null
+  Cost Basis Total: cost_basis
+  Current Value: market_value
+  Description: name
+  Last Price: price
+  Quantity: qty
+  Symbol: symbol
+file_type: positions
+fingerprint: fidelity_positions
+name: Fidelity Positions
+type_aliases: {}

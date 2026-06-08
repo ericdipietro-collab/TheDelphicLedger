@@ -1,0 +1,54 @@
+{
+  "file_type": "positions",
+  "broker_fingerprint": "a55839c0c218b15b",
+  "template_name": "Vanguard Positions",
+  "row_count": 5,
+  "queued_types": [],
+  "rows": [
+    {
+      "instrument": "VTSAX",
+      "name": "Vanguard Total Stock Market Index Fund Admiral Shares",
+      "qty": "500",
+      "price": "124.85",
+      "cost_basis": "45000.00",
+      "market_value": "62425.00",
+      "as_of": null
+    },
+    {
+      "instrument": "VTIAX",
+      "name": "Vanguard Total International Stock Index Fund Admiral Shares",
+      "qty": "300",
+      "price": "34.21",
+      "cost_basis": "9000.00",
+      "market_value": "10263.00",
+      "as_of": null
+    },
+    {
+      "instrument": "VBTLX",
+      "name": "Vanguard Total Bond Market Index Fund Admiral Shares",
+      "qty": "400",
+      "price": "9.82",
+      "cost_basis": "4000.00",
+      "market_value": "3928.00",
+      "as_of": null
+    },
+    {
+      "instrument": "VMFXX",
+      "name": "Vanguard Federal Money Market Fund",
+      "qty": "2500",
+      "price": "1.00",
+      "cost_basis": "2500.00",
+      "market_value": "2500.00",
+      "as_of": null
+    },
+    {
+      "instrument": "VFIFX",
+      "name": "Vanguard Target Retirement 2050 Fund",
+      "qty": "150",
+      "price": "42.30",
+      "cost_basis": "5000.00",
+      "market_value": "6345.00",
+      "as_of": null
+    }
+  ]
+}

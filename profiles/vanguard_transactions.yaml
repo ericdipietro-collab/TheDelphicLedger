@@ -1,0 +1,15 @@
+column_map:
+  Commission and Fees: fees
+  Investment Name: name
+  Net Amount: amount
+  Principal Amount: null
+  Settlement Date: settle_date
+  Share Price: price
+  Shares: qty
+  Symbol: symbol
+  Trade Date: trade_date
+  Transaction Type: raw_type
+file_type: transactions
+fingerprint: vanguard_transactions
+name: Vanguard Transactions
+type_aliases: {}

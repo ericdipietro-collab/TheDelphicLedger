@@ -1,0 +1,16 @@
+column_map:
+  Action: raw_type
+  Amount ($): amount
+  Commission ($): fees
+  Date: trade_date
+  Fees ($): null
+  Quantity: qty
+  Security Description: name
+  Settlement Date: settle_date
+  Symbol: symbol
+  Price ($): price
+file_type: transactions
+fingerprint: fidelity_transactions
+name: Fidelity Transactions
+type_aliases:
+  DIRECT DEBIT: transfer_out

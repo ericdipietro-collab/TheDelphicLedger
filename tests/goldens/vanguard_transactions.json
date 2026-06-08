@@ -1,0 +1,54 @@
+{
+  "file_type": "transactions",
+  "broker_fingerprint": "bebe70f79c2b9448",
+  "template_name": "Vanguard Transactions",
+  "row_count": 5,
+  "queued_types": [],
+  "rows": [
+    {
+      "instrument": "VTSAX",
+      "trade_date": "2026-06-01",
+      "raw_type": "Buy",
+      "canonical_type": "buy",
+      "qty": "10",
+      "price": "124.10",
+      "amount": "-1241.00"
+    },
+    {
+      "instrument": "VTIAX",
+      "trade_date": "2026-06-03",
+      "raw_type": "Dividend Reinvestment",
+      "canonical_type": "reinvest",
+      "qty": "1.456",
+      "price": "34.00",
+      "amount": "0.00"
+    },
+    {
+      "instrument": "VBTLX",
+      "trade_date": "2026-06-05",
+      "raw_type": "Dividend",
+      "canonical_type": "dividend",
+      "qty": null,
+      "price": null,
+      "amount": "12.40"
+    },
+    {
+      "instrument": "VMFXX",
+      "trade_date": "2026-06-06",
+      "raw_type": "Sweep",
+      "canonical_type": "sweep",
+      "qty": "12.40",
+      "price": "1.00",
+      "amount": "0.00"
+    },
+    {
+      "instrument": "VTSAX",
+      "trade_date": "2026-06-07",
+      "raw_type": "Sell",
+      "canonical_type": "sell",
+      "qty": "5",
+      "price": "125.00",
+      "amount": "625.00"
+    }
+  ]
+}

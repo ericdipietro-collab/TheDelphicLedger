@@ -1,0 +1,64 @@
+[project]
+name = "committee"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "typer[all]>=0.12",
+    "sqlalchemy>=2.0",
+    "rapidfuzz>=3",
+    "pydantic>=2",
+    "pyyaml>=6",
+    "python-dateutil>=2.9",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "mypy>=1.10",
+    "ruff>=0.5",
+    "sqlalchemy[mypy]>=2.0",
+    "import-linter>=2",
+]
+
+[project.scripts]
+committee = "committee.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/committee"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+mypy_path = "src"
+plugins = ["sqlalchemy.ext.mypy.plugin"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+# import-linter contracts (activate once oracles/ and rebalancer/ exist)
+# [tool.importlinter]
+# root_packages = ["committee"]
+#
+# [[tool.importlinter.contracts]]
+# name = "oracles must not import rebalancer"
+# type = "forbidden"
+# source_modules = ["committee.oracles"]
+# forbidden_modules = ["committee.rebalancer"]
+#
+# [[tool.importlinter.contracts]]
+# name = "rebalancer must not import signals or oracles"
+# type = "forbidden"
+# source_modules = ["committee.rebalancer"]
+# forbidden_modules = ["committee.signals", "committee.oracles"]

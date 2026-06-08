@@ -1,0 +1,6 @@
+Account Number,Account Name,Symbol,Description,Quantity,Last Price,Last Price Change,Current Value,Today's Gain/Loss Dollar,Today's Gain/Loss Percent,Total Gain/Loss Dollar,Total Gain/Loss Percent,Percent Of Account,Cost Basis Total,Average Cost Basis,Type
+X12345678,Individual - TOD,AAPL,Apple Inc,100,$189.30,+$0.98,"$18,930.00",+$98.00,+0.52%,+$6,930.00,+57.75%,22.15%,"$12,000.00",$120.00,Margin
+X12345678,Individual - TOD,BRK.B,Berkshire Hathaway Inc - Class B,25,$403.50,-$0.48,"$10,087.50",-$12.00,-0.12%,+$2,587.50,+34.52%,11.81%,"$7,500.00",$300.00,Cash
+X12345678,Individual - TOD,SPAXX,FIDELITY GOVERNMENT MONEY MARKET,500,$1.00,$0.00,"$500.00",$0.00,+0.00%,$0.00,+0.00%,0.59%,"$500.00",$1.00,Cash
+X12345678,Individual - TOD,,FIDELITY TOTAL BOND FUND,200,,,"$20,000.00",,"","","",23.41%,"$18,000.00",$90.00,Cash
+Account X12345678 Total,,,,,,,"$49,517.50","$86.00","","$9,517.50","","","$38,000.00",,

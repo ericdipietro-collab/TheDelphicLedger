@@ -1,0 +1,11 @@
+column_map:
+  Cost Basis: cost_basis
+  Description: name
+  Market Value: market_value
+  Price: price
+  Qty: qty
+  Symbol: symbol
+file_type: positions
+fingerprint: schwab_positions
+name: Schwab Positions
+type_aliases: {}

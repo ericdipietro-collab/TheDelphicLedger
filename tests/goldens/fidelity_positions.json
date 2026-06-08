@@ -1,0 +1,36 @@
+{
+  "file_type": "positions",
+  "broker_fingerprint": "b48ecd9bc30da792",
+  "template_name": "Fidelity Positions",
+  "row_count": 3,
+  "queued_types": [],
+  "rows": [
+    {
+      "instrument": "AAPL",
+      "name": "Apple Inc",
+      "qty": "100",
+      "price": "189.30",
+      "cost_basis": "22.15",
+      "market_value": "18930.00",
+      "as_of": null
+    },
+    {
+      "instrument": "BRK.B",
+      "name": "Berkshire Hathaway Inc - Class B",
+      "qty": "25",
+      "price": "403.50",
+      "cost_basis": "11.81",
+      "market_value": "10087.50",
+      "as_of": null
+    },
+    {
+      "instrument": "SPAXX",
+      "name": "FIDELITY GOVERNMENT MONEY MARKET",
+      "qty": "500",
+      "price": "1.00",
+      "cost_basis": "500.00",
+      "market_value": "500.00",
+      "as_of": null
+    }
+  ]
+}

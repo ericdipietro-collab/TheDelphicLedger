@@ -1,0 +1,11 @@
+column_map:
+  Cost Basis: cost_basis
+  Fund Name: name
+  Share Price: price
+  Shares: qty
+  Ticker Symbol: symbol
+  Total Value: market_value
+file_type: positions
+fingerprint: vanguard_positions
+name: Vanguard Positions
+type_aliases: {}

@@ -1,0 +1,9 @@
+Account Number
+12345678
+
+Trade Date,Settlement Date,Transaction Type,Transaction Description,Investment Name,Symbol,Shares,Share Price,Principal Amount,Commission and Fees,Net Amount
+06/01/2026,06/03/2026,Buy,Buy,Vanguard Total Stock Market Index Fund Admiral Shares,VTSAX,10,$124.10,,"$0.00","-$1,241.00"
+06/03/2026,06/03/2026,Dividend Reinvestment,Dividend Reinvestment,Vanguard Total International Stock Index Fund Admiral Shares,VTIAX,1.456,$34.00,"$49.50","$0.00","$0.00"
+06/05/2026,06/05/2026,Dividend,Dividend,Vanguard Total Bond Market Index Fund Admiral Shares,VBTLX,,"","$12.40","$0.00","$12.40"
+06/06/2026,06/06/2026,Sweep,Sweep to Money Market,Vanguard Federal Money Market Fund,VMFXX,12.40,$1.00,"$12.40","$0.00","$0.00"
+06/07/2026,06/09/2026,Sell,Sell,Vanguard Total Stock Market Index Fund Admiral Shares,VTSAX,5,$125.00,"$625.00","$0.00","$625.00"
