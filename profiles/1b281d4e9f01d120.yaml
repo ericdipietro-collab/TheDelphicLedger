@@ -1,0 +1,22 @@
+column_map:
+  '% Of Account': null
+  Capital Gains?: null
+  Cost Basis: cost_basis
+  Day Change $: null
+  Day Change %: null
+  Description: raw_type
+  Gain/Loss $: null
+  Gain/Loss %: null
+  Market Value: market_value
+  Price: price
+  Price Change $: null
+  Price Change %: null
+  Qty: qty
+  Ratings: null
+  Reinvest Dividends?: null
+  Security Type: null
+  Symbol: symbol
+file_type: transactions
+fingerprint: 1b281d4e9f01d120
+name: template_1b281d4e9f01d120
+type_aliases: {}

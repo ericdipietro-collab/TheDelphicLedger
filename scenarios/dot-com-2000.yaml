@@ -1,0 +1,31 @@
+id: dot-com-2000
+display_name: "Dot-com Bust (2000–2002)"
+type: historical
+version: "1"
+
+honesty_note: >
+  Sleeve-level shocks, not security-level. The dot-com bust wiped out thousands of individual
+  companies entirely (Pets.com, Webvan, WorldCom, Global Crossing). A security-level replay
+  would misleadingly apply those losses to present holdings, most of which did not exist in
+  2000 in their current form. Sleeve averages reflect what diversified index holders experienced.
+
+sources:
+  - "US equities (S&P 500): −49.1% peak-to-trough Mar 2000–Oct 2002 (Bloomberg)"
+  - "International equities (MSCI EAFE): −47.8% peak-to-trough 2000–2002"
+  - "US Aggregate Bond Index: +17.1% total return 2000–2002 (Barclays/Bloomberg)"
+  - "Alternatives (HFRX Global Hedge Fund): approximately −20% over the bust period"
+  - "Cash/money market: unaffected (short-term rates elevated 2000–2001)"
+
+sleeve_shocks:
+  equity_us: "-0.491"
+  equity_intl: "-0.478"
+  fixed_income: "0.171"
+  alternatives: "-0.200"
+  cash: "0.0"
+
+# Indicator overrides: late-cycle inversion (2000) into deep recession (2001–02)
+indicator_overrides:
+  T10Y3M: "-0.60"      # 10y-3m spread inverted sharply in 2000 (BLS/Fed H.15)
+  BAMLH0A0HYM2: "10.00" # HY OAS peaked ~1000bps in 2002 telecom/energy blowup
+  VIXCLS: "45.08"      # VIX peaked ~45 in late 2002 (CBOE)
+  UNRATE: "6.3"        # US unemployment rate Jun 2003 peak (BLS)

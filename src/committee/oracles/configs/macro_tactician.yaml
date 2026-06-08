@@ -1,0 +1,32 @@
+id: macro_tactician
+display_name: "The Macro Tactician"
+rivals: [value_purist, growth_visionary]
+universe_filter: null
+# Default (neutral-regime) sleeve targets.
+# Regime state machine overrides these via defensive_/aggressive_sleeve_targets.
+sleeve_targets:
+  equity_us: "0.40"
+  equity_intl: "0.20"
+  fixed_income: "0.30"
+  alternatives: "0.05"
+  cash: "0.05"
+defensive_sleeve_targets:
+  equity_us: "0.30"
+  equity_intl: "0.15"
+  fixed_income: "0.45"
+  alternatives: "0.05"
+  cash: "0.05"
+aggressive_sleeve_targets:
+  equity_us: "0.55"
+  equity_intl: "0.25"
+  fixed_income: "0.10"
+  alternatives: "0.05"
+  cash: "0.05"
+# No per-holding metric weights — Macro Tactician drives sleeve tilts only.
+metric_weights: {}
+persona_constraints: {}
+abstain_floor: 0.0
+regime_block_weights:
+  macro: 0.50
+  sentiment: 0.30
+  trend: 0.20

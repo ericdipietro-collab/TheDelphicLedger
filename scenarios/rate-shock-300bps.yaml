@@ -1,0 +1,33 @@
+id: rate-shock-300bps
+display_name: "Hypothetical +300bps Rate Shock"
+type: hypothetical
+version: "1"
+
+honesty_note: >
+  This is a hypothetical scenario. A sudden +300bps parallel shift in the yield curve has no
+  direct historical precedent in the modern era (the 1994 bond market sell-off was ~200bps over
+  12 months; 2022 was ~425bps over 12 months but anticipated). This pack models an acute,
+  rapid shock of that magnitude. Sleeve-level shocks are derived from standard duration math
+  and historical regression of equity valuations to rate moves. This pack does not predict or
+  imply that such a shock will occur.
+
+sources:
+  - "Fixed income: modified duration ~8 for US Agg × 300bps = −24% price impact (Bloomberg)"
+  - "US equities: historical regression ~−5% per 100bps in rapid rate shocks; −15% at 300bps"
+  - "International equities: similar mechanism but lower duration sensitivity; −10%"
+  - "Alternatives: moderate rate sensitivity; −10% assumed"
+  - "Cash: benefits from higher short-term rates; +2% yield pickup approximated"
+
+sleeve_shocks:
+  equity_us: "-0.150"
+  equity_intl: "-0.100"
+  fixed_income: "-0.240"
+  alternatives: "-0.100"
+  cash: "0.020"
+
+# Indicator overrides: post-shock macro conditions
+indicator_overrides:
+  T10Y3M: "3.20"        # term premium restored; 10y well above 3m
+  BAMLH0A0HYM2: "7.50"  # HY OAS widens moderately on refinancing risk
+  VIXCLS: "35.0"        # elevated uncertainty; not panic levels
+  UNRATE: "5.0"         # modest unemployment increase from higher rates

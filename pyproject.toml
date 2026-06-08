@@ -1,7 +1,18 @@
 [project]
-name = "committee"
+name = "delphic-ledger"
 version = "0.1.0"
+description = "Six investment philosophies. Zero consensus. A local portfolio analysis engine."
+authors = [{name = "Eric DiPietro"}]
+readme = "README.md"
+license = {file = "LICENSE"}
 requires-python = ">=3.12"
+keywords = ["finance", "portfolio", "investment", "rebalancing", "cli"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Topic :: Office/Business :: Financial :: Investment",
+    "Programming Language :: Python :: 3.12",
+]
 dependencies = [
     "typer[all]>=0.12",
     "sqlalchemy>=2.0",
@@ -11,6 +22,8 @@ dependencies = [
     "python-dateutil>=2.9",
     "requests>=2.32",
     "yfinance>=0.2",
+    "fastapi>=0.111",
+    "uvicorn[standard]>=0.30",
 ]
 
 [project.optional-dependencies]
@@ -21,7 +34,12 @@ dev = [
     "sqlalchemy[mypy]>=2.0",
     "import-linter>=2",
     "responses>=0.25",
+    "httpx>=0.27",
 ]
+
+[project.urls]
+Homepage = "https://github.com/ericdipietro-collab/DelphiLedger"
+Repository = "https://github.com/ericdipietro-collab/DelphiLedger"
 
 [project.scripts]
 committee = "committee.cli:app"
@@ -49,19 +67,19 @@ ignore = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning:starlette"]
 
-# import-linter contracts (activate once oracles/ and rebalancer/ exist)
-# [tool.importlinter]
-# root_packages = ["committee"]
-#
-# [[tool.importlinter.contracts]]
-# name = "oracles must not import rebalancer"
-# type = "forbidden"
-# source_modules = ["committee.oracles"]
-# forbidden_modules = ["committee.rebalancer"]
-#
-# [[tool.importlinter.contracts]]
-# name = "rebalancer must not import signals or oracles"
-# type = "forbidden"
-# source_modules = ["committee.rebalancer"]
-# forbidden_modules = ["committee.signals", "committee.oracles"]
+[tool.importlinter]
+root_packages = ["committee"]
+
+[[tool.importlinter.contracts]]
+name = "oracles must not import rebalancer"
+type = "forbidden"
+source_modules = ["committee.oracles"]
+forbidden_modules = ["committee.rebalancer"]
+
+[[tool.importlinter.contracts]]
+name = "rebalancer must not import signals or oracles"
+type = "forbidden"
+source_modules = ["committee.rebalancer"]
+forbidden_modules = ["committee.signals", "committee.oracles"]

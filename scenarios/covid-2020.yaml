@@ -1,0 +1,33 @@
+id: covid-2020
+display_name: "COVID-19 Crash (February–March 2020)"
+type: historical
+version: "1"
+
+honesty_note: >
+  Sleeve-level shocks, not security-level. While the COVID drawdown was broad-based, individual
+  securities (airlines, hotels, cruise lines) fell far more than index averages, and some failed
+  outright. Applying those tail outcomes to present holdings is survivorship bias in reverse:
+  a current portfolio by definition survived. Sleeve averages reflect what diversified holders
+  experienced during the 33-day crash from Feb 19 to Mar 23, 2020.
+
+sources:
+  - "US equities (S&P 500): −33.9% Feb 19–Mar 23, 2020 (Bloomberg)"
+  - "International equities (MSCI EAFE): −33.4% same period (MSCI)"
+  - "US Aggregate Bond Index: +0.9% Q1 2020 — flight to quality offset spread widening (Bloomberg)"
+  - "Real estate / REITs (NAREIT All Equity): −42.7% peak-to-trough Q1 2020 (NAREIT)"
+  - "Alternatives (HFRX Global Hedge Fund): approximately −20% Mar 2020"
+  - "Cash/money market: unaffected; Fed cut to 0–0.25% Mar 15, 2020"
+
+sleeve_shocks:
+  equity_us: "-0.339"
+  equity_intl: "-0.334"
+  fixed_income: "0.009"
+  alternatives: "-0.200"
+  cash: "0.0"
+
+# Indicator overrides: acute crisis conditions mid-March 2020
+indicator_overrides:
+  T10Y3M: "0.40"       # 10y-3m slightly positive; Fed cut short end aggressively
+  BAMLH0A0HYM2: "10.87" # HY OAS peaked ~1087bps Mar 23, 2020 (ICE BofA, Bloomberg)
+  VIXCLS: "82.69"      # VIX peaked Mar 16, 2020 (CBOE) — highest since 2008
+  UNRATE: "14.7"       # US unemployment rate Apr 2020 peak (BLS)

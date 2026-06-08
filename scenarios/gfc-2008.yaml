@@ -1,0 +1,32 @@
+id: gfc-2008
+display_name: "Global Financial Crisis (2008–09)"
+type: historical
+version: "1"
+
+honesty_note: >
+  Sleeve-level shocks, not security-level. Lehman Brothers, Bear Stearns, Washington Mutual,
+  Wachovia, and hundreds of smaller financials no longer exist. Applying their −100% returns
+  to current portfolios is nonsensical. The sleeve averages below represent what a diversified
+  investor holding broad index funds experienced — which is the right counterfactual for stress-
+  testing a present-day portfolio.
+
+sources:
+  - "US equities (S&P 500): −56.8% peak-to-trough Oct 2007–Mar 2009 (Bloomberg)"
+  - "International equities (MSCI EAFE): −56.7% peak-to-trough (MSCI)"
+  - "US Aggregate Bond Index: −3.7% in 2008 (Bloomberg Barclays); Treasuries +13.7%"
+  - "Alternatives (HFRX Global Hedge Fund): −23.3% in 2008"
+  - "Cash/money market: unaffected; ZIRP adopted Dec 2008"
+
+sleeve_shocks:
+  equity_us: "-0.568"
+  equity_intl: "-0.567"
+  fixed_income: "-0.037"
+  alternatives: "-0.233"
+  cash: "0.0"
+
+# Indicator overrides: peak stress conditions Q4 2008
+indicator_overrides:
+  T10Y3M: "-0.32"       # 10y-3m inverted late 2006–mid 2007; at peak crisis near flat/slight neg
+  BAMLH0A0HYM2: "18.50" # HY OAS peaked ~1850bps Nov 2008 (ICE BofA HY Index, Bloomberg)
+  VIXCLS: "80.86"       # VIX all-time closing high Nov 20, 2008 (CBOE)
+  UNRATE: "10.0"        # US unemployment rate peaked Oct 2009 (BLS)

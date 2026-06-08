@@ -1,0 +1,18 @@
+id: passive_pragmatist
+display_name: "The Passive Pragmatist"
+rivals: [growth_visionary, quant]
+universe_filter: null
+sleeve_targets:
+  equity_us: "0.40"
+  equity_intl: "0.20"
+  fixed_income: "0.30"
+  alternatives: "0.05"
+  cash: "0.05"
+metric_weights:
+  expense_ratio: 0.40
+  concentration_hhi: 0.30
+  individual_stock_pct: 0.30
+persona_constraints:
+  individual_stock_target: "0.00"
+  min_score_to_buy: 0.0
+abstain_floor: 0.30

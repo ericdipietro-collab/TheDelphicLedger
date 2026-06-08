@@ -42,3 +42,16 @@ Thumbs.db
 # Local constraint profiles (personal mode)
 profiles/personal*.yaml
 profiles/workiva*.yaml
+
+# Personal watchlists (ticker lists, bundle watchlists)
+watchlist.yaml
+watchlists.yaml
+profiles/watchlist*.yaml
+data/watchlist*.yaml
+
+# Dashboard build artifacts (not source)
+dashboard/dist/
+
+# Runtime logs and browser automation artifacts
+logs/
+.playwright-mcp/

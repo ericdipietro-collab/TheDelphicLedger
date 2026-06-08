@@ -250,12 +250,26 @@ class Fundamental(Base):
     )
 
 
+class RegimeState(Base):
+    """Single-row table tracking the Macro Tactician's regime tilt across runs."""
+
+    __tablename__ = "regime_state"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)  # always 1
+    tilt: Mapped[str] = mapped_column(Text, nullable=False, default="neutral")
+    composite_score: Mapped[float | None] = mapped_column(DecimalText, nullable=True)  # type: ignore[assignment]
+    pending_tilt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    confirmation_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
 class Decision(Base):
-    """Audit row for every committee run."""
+    """Audit row for every committee run — one row per oracle per run_id."""
 
     __tablename__ = "decisions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    run_id: Mapped[str] = mapped_column(Text, nullable=False, index=True)
     run_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
     )
@@ -263,7 +277,10 @@ class Decision(Base):
     persona_key: Mapped[str] = mapped_column(Text, nullable=False)
     inputs_json: Mapped[Any] = mapped_column(JSON, nullable=False)
     outputs_json: Mapped[Any] = mapped_column(JSON, nullable=False)
+    proposals_json: Mapped[Any] = mapped_column(JSON, nullable=True)
     regime_state: Mapped[str | None] = mapped_column(Text, nullable=True)
+    scenario_id: Mapped[str | None] = mapped_column(Text, nullable=True)
+    dry_run: Mapped[bool] = mapped_column(Integer, nullable=False, default=False)
 
 
 class BundleState(Base):

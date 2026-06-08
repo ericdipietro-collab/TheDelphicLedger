@@ -1,0 +1,33 @@
+id: ai-bubble
+display_name: "Hypothetical AI Bubble Burst"
+type: hypothetical
+version: "1"
+
+honesty_note: >
+  This is a hypothetical scenario, not a historical record. Magnitudes are calibrated to
+  the dot-com bust (2000–2002) for the growth-heavy US equity sleeve, with international
+  equities less affected (less AI-concentration), and a flight-to-quality bond rally.
+  This pack does NOT predict or imply that an AI bubble will occur or that these specific
+  returns are likely. It is a stress test only. Sleeve-level shocks avoid the survivorship
+  bias of imagining which specific AI companies fail.
+
+sources:
+  - "Calibrated to NASDAQ Composite −77.9% peak-to-trough 2000–2002 (Bloomberg) — analogous"
+  - "US equity sleeve blended: concentrated growth names at −35%; broader index at −55%"
+  - "International: less AI-concentration assumed; roughly dot-com −25%"
+  - "Bonds: flight-to-quality assumed similar to 2000–2002 (+10%)"
+  - "Alternatives: moderate dislocation assumed"
+
+sleeve_shocks:
+  equity_us: "-0.550"
+  equity_intl: "-0.250"
+  fixed_income: "0.100"
+  alternatives: "-0.150"
+  cash: "0.0"
+
+# Indicator overrides: hypothetical late-cycle/post-bust macro conditions
+indicator_overrides:
+  T10Y3M: "-0.80"       # yield curve inverts as Fed is slow to cut
+  BAMLH0A0HYM2: "12.00" # HY spreads blow out in tech/levered-growth sector
+  VIXCLS: "55.0"        # sustained elevated vol; not a single-day spike
+  UNRATE: "7.5"         # unemployment rises meaningfully (hypothetical)

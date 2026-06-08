@@ -1,0 +1,18 @@
+column_map:
+  Account: amount
+  Accrued Interest ($): null
+  Action: raw_type
+  Amount ($): amount
+  Commission ($): fees
+  Date: trade_date
+  Fees ($): null
+  Price ($): price
+  Quantity: qty
+  Security Description: name
+  Security Type: null
+  Settlement Date: settle_date
+  Symbol: symbol
+file_type: transactions
+fingerprint: 61a349e99f96dfe4
+name: template_61a349e99f96dfe4
+type_aliases: {}

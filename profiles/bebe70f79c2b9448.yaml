@@ -1,0 +1,16 @@
+column_map:
+  Commission and Fees: null
+  Investment Name: name
+  Net Amount: amount
+  Principal Amount: null
+  Settlement Date: settle_date
+  Share Price: price
+  Shares: qty
+  Symbol: symbol
+  Trade Date: trade_date
+  Transaction Description: null
+  Transaction Type: raw_type
+file_type: transactions
+fingerprint: bebe70f79c2b9448
+name: template_bebe70f79c2b9448
+type_aliases: {}

@@ -1,0 +1,13 @@
+column_map:
+  Action: raw_type
+  Amount: amount
+  Date: trade_date
+  Description: name
+  Fees & Comm: null
+  Price: price
+  Qty: qty
+  Symbol: symbol
+file_type: transactions
+fingerprint: 9f4329467c106a77
+name: template_9f4329467c106a77
+type_aliases: {}

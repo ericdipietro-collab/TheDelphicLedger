@@ -1,0 +1,32 @@
+id: black-monday-1987
+display_name: "Black Monday (October 1987)"
+type: historical
+version: "1"
+
+honesty_note: >
+  Sleeve-level shocks, not security-level. Applying 1987 shocks per individual security
+  would invite survivorship bias: many equities that existed in 1987 are gone (bankruptcies,
+  mergers, delistings). The sleeve averages below represent what broadly diversified holders
+  actually experienced.
+
+sources:
+  - "US equities (DJIA): −22.6% on October 19, 1987 alone (Bloomberg/DJIA record)"
+  - "International equities: approximately −20% in Oct 1987 (MSCI World ex-US)"
+  - "US Treasuries: modest flight-to-quality rally; 10-year yield fell ~50bps Oct 1987"
+  - "Alternatives/hedge strategies: approximately −15% on dislocated correlations"
+  - "Cash/money market: unaffected"
+
+sleeve_shocks:
+  equity_us: "-0.226"
+  equity_intl: "-0.200"
+  fixed_income: "0.020"
+  alternatives: "-0.150"
+  cash: "0.0"
+
+# Indicator overrides: what macro data would have looked like at peak stress
+# T10Y3M is approximate; yield curve was near flat pre-crash
+indicator_overrides:
+  T10Y3M: "0.10"       # near-flat curve; 3m/10y spread tight pre-crash
+  BAMLH0A0HYM2: "4.50" # HY OAS spiked from ~2.5% to ~4.5% (approx; HY market thin in 1987)
+  VIXCLS: "150.0"      # VIX-equivalent implied vol spiked; formal VIX not computed until 1993
+  UNRATE: "6.1"        # US unemployment rate Oct 1987 (BLS)

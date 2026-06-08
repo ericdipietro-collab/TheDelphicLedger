@@ -1,0 +1,19 @@
+id: yield_harvester
+display_name: "The Yield Harvester"
+rivals: [growth_visionary]
+universe_filter: null
+sleeve_targets:
+  equity_us: "0.25"
+  equity_intl: "0.15"
+  fixed_income: "0.45"
+  alternatives: "0.10"
+  cash: "0.05"
+metric_weights:
+  dividend_yield: 0.35
+  payout_ratio: 0.20
+  dividend_growth_years: 0.20
+  fund_distribution_yield: 0.25
+persona_constraints:
+  min_yield: "0.02"
+  min_score_to_buy: 0.0
+abstain_floor: 0.30

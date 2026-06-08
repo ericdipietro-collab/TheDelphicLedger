@@ -1,0 +1,18 @@
+id: value_purist
+display_name: "The Value Purist"
+rivals: [growth_visionary]
+universe_filter: equity_only
+sleeve_targets:
+  equity_us: "0.40"
+  equity_intl: "0.20"
+  fixed_income: "0.30"
+  alternatives: "0.05"
+  cash: "0.05"
+metric_weights:
+  pe_ratio: 0.30
+  pb_ratio: 0.25
+  fcf_yield: 0.25
+  debt_equity: 0.20
+persona_constraints:
+  min_score_to_buy: -0.2
+abstain_floor: 0.4

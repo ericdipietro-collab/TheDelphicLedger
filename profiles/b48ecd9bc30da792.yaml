@@ -1,0 +1,21 @@
+column_map:
+  Account Name: amount
+  Account Number: null
+  Average Cost Basis: cost_basis
+  Cost Basis Total: cost_basis
+  Current Value: market_value
+  Description: raw_type
+  Last Price: price
+  Last Price Change: null
+  Percent Of Account: null
+  Quantity: qty
+  Symbol: symbol
+  Today's Gain/Loss Dollar: null
+  Today's Gain/Loss Percent: null
+  Total Gain/Loss Dollar: null
+  Total Gain/Loss Percent: null
+  Type: null
+file_type: transactions
+fingerprint: b48ecd9bc30da792
+name: template_b48ecd9bc30da792
+type_aliases: {}

@@ -1,0 +1,4 @@
+id: unconstrained
+display_name: "Unconstrained"
+description: "Showcase mode — any instrument type (stocks, ETFs, funds) may be bought."
+allowed_buy_types: []

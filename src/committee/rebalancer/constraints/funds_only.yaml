@@ -1,0 +1,7 @@
+id: funds_only
+display_name: "Funds Only"
+description: "Individual stock positions may only be sold or held. Only ETFs and mutual funds may be purchased."
+allowed_buy_types:
+  - etf
+  - mutual_fund
+  - cash

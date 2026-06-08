@@ -1,0 +1,12 @@
+column_map:
+  '% of Portfolio': null
+  Cost Basis: cost_basis
+  Fund Name: name
+  Share Price: price
+  Shares: qty
+  Ticker Symbol: symbol
+  Total Value: market_value
+file_type: positions
+fingerprint: a55839c0c218b15b
+name: template_a55839c0c218b15b
+type_aliases: {}
