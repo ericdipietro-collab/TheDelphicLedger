@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { AlertTriangle, ArrowLeftRight } from 'lucide-react'
 import { api, TradesResponse, OracleProposals, ConfigResponse } from '../api'
 import { ORACLE_IDS, ORACLE_COLOR, DIRECTION_COLOR, fmtMoney, fmtScore } from '../constants'
 
@@ -146,7 +147,25 @@ export function Trades() {
   }
 
   if (loading) return <div className="text-slate-500 animate-pulse p-4">Loading…</div>
-  if (error) return <div className="p-4 text-slate-400 text-sm">{error}</div>
+  if (error) return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+      <ArrowLeftRight size={32} className="text-slate-700" />
+      <div className="text-center">
+        <p className="text-slate-400 font-medium mb-1">No trade proposals</p>
+        <p className="text-sm text-slate-600 max-w-sm">Convene the oracles first to generate rebalancing proposals.</p>
+      </div>
+      <div className="px-4 py-2.5 rounded-lg bg-slate-900 border border-slate-800 font-mono text-xs text-slate-400">
+        committee convene
+      </div>
+      <details className="max-w-sm w-full">
+        <summary className="text-xs text-slate-700 cursor-pointer hover:text-slate-500 flex items-center gap-1.5 justify-center">
+          <AlertTriangle size={12} />
+          Technical detail
+        </summary>
+        <p className="mt-2 text-xs text-slate-700 font-mono break-all bg-slate-900 rounded p-2 border border-slate-800">{error}</p>
+      </details>
+    </div>
+  )
   if (!data) return null
 
   return (

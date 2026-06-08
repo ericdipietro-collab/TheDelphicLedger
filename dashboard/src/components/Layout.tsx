@@ -1,12 +1,20 @@
 import { NavLink } from 'react-router-dom'
+import {
+  Landmark,
+  PieChart,
+  ArrowLeftRight,
+  FlaskConical,
+  Scale,
+  Settings2,
+} from 'lucide-react'
 
 const NAV = [
-  { to: '/',          label: 'The Chamber',  icon: '⬡' },
-  { to: '/portfolio', label: 'Portfolio',    icon: '◯' },
-  { to: '/trades',    label: 'Trades',       icon: '⇄' },
-  { to: '/scenarios', label: 'Scenarios',    icon: '◈' },
-  { to: '/recon',     label: 'Recon',        icon: '≡' },
-  { to: '/config',    label: 'Config',       icon: '⊕' },
+  { to: '/',          label: 'The Chamber',  Icon: Landmark        },
+  { to: '/portfolio', label: 'Portfolio',    Icon: PieChart        },
+  { to: '/trades',    label: 'Trades',       Icon: ArrowLeftRight  },
+  { to: '/scenarios', label: 'Scenarios',    Icon: FlaskConical    },
+  { to: '/recon',     label: 'Recon',        Icon: Scale           },
+  { to: '/config',    label: 'Config',       Icon: Settings2       },
 ]
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -22,7 +30,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
         <nav className="flex-1 px-2 py-3 space-y-0.5">
-          {NAV.map(({ to, label, icon }) => (
+          {NAV.map(({ to, label, Icon }) => (
             <NavLink
               key={to}
               to={to}
@@ -35,8 +43,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 }`
               }
             >
-              <span className="text-base w-5 text-center">{icon}</span>
-              {label}
+              {({ isActive }) => (
+                <>
+                  <Icon size={16} className={isActive ? 'text-white' : 'text-slate-500'} />
+                  {label}
+                </>
+              )}
             </NavLink>
           ))}
         </nav>

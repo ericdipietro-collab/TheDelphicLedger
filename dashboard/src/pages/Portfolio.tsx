@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, ReferenceLine } from 'recharts'
+import { AlertTriangle, Wallet } from 'lucide-react'
 import { api, PortfolioResponse } from '../api'
 import { ORACLE_IDS, ORACLE_COLOR, ORACLE_DISPLAY, SLEEVE_COLORS, SLEEVE_LABELS, fmtMoney, fmtPct, fmtScore, scoreColor } from '../constants'
 
@@ -18,7 +19,25 @@ export function Portfolio() {
   }, [oracle])
 
   if (loading) return <div className="text-slate-500 animate-pulse p-4">Loading…</div>
-  if (error) return <div className="p-4 text-slate-400 text-sm">{error}</div>
+  if (error) return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+      <Wallet size={32} className="text-slate-700" />
+      <div className="text-center">
+        <p className="text-slate-400 font-medium mb-1">No portfolio data</p>
+        <p className="text-sm text-slate-600 max-w-sm">Import holdings to populate the portfolio view.</p>
+      </div>
+      <div className="px-4 py-2.5 rounded-lg bg-slate-900 border border-slate-800 font-mono text-xs text-slate-400">
+        committee import
+      </div>
+      <details className="max-w-sm w-full">
+        <summary className="text-xs text-slate-700 cursor-pointer hover:text-slate-500 flex items-center gap-1.5 justify-center">
+          <AlertTriangle size={12} />
+          Technical detail
+        </summary>
+        <p className="mt-2 text-xs text-slate-700 font-mono break-all bg-slate-900 rounded p-2 border border-slate-800">{error}</p>
+      </details>
+    </div>
+  )
   if (!data) return null
 
   const pieData = data.allocations.map((a, i) => ({
