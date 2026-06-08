@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from committee.api.routes import chamber, config, portfolio, recon, scenarios, trades
+from committee.api.routes import actions, chamber, config, portfolio, recon, scenarios, trades
 
 
 @asynccontextmanager
@@ -41,6 +41,7 @@ app.add_middleware(
 )
 
 # API routers
+app.include_router(actions.router)
 app.include_router(chamber.router)
 app.include_router(portfolio.router)
 app.include_router(trades.router)

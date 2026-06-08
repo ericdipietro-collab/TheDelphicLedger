@@ -232,4 +232,7 @@ export const api = {
   getScenario: (pack_id: string) => get<ScenarioResult>(`/scenarios/${pack_id}`),
   getRecon: () => get<ReconResponse>('/recon'),
   getConfig: () => get<ConfigResponse>('/config'),
+  convene: (constraint = 'unconstrained') => post<ChamberResponse>('/actions/convene', { constraint }),
+  runScenario: (pack_id: string, constraint = 'unconstrained') =>
+    post<ScenarioResult>(`/actions/scenario/${pack_id}/run`, { constraint }),
 }

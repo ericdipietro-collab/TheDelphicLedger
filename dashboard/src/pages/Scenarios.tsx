@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Play } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Cell, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { api, PackSummary, ScenarioResult } from '../api'
 import { ORACLE_COLOR, SLEEVE_LABELS, fmtMoney, fmtPct } from '../constants'
@@ -114,16 +115,20 @@ export function Scenarios() {
   const [packs, setPacks] = useState<PackSummary[]>([])
   const [selected, setSelected] = useState<string | null>(null)
   const [result, setResult] = useState<ScenarioResult | null>(null)
-  const [_error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [resultLoading, setResultLoading] = useState(false)
+  const [running, setRunning] = useState(false)
 
-  useEffect(() => {
+  const reloadPacks = () =>
     api.listScenarios().then(pks => {
       setPacks(pks)
       const first = pks.find(p => p.has_run)
-      if (first) setSelected(first.pack_id)
-    }).catch(e => setError(String(e))).finally(() => setLoading(false))
+      if (first && !selected) setSelected(first.pack_id)
+    }).catch(e => setError(String(e)))
+
+  useEffect(() => {
+    reloadPacks().finally(() => setLoading(false))
   }, [])
 
   useEffect(() => {
@@ -135,6 +140,21 @@ export function Scenarios() {
       .finally(() => setResultLoading(false))
   }, [selected])
 
+  const handleRun = async (pack_id: string) => {
+    setRunning(true)
+    setError(null)
+    try {
+      const res = await api.runScenario(pack_id)
+      setResult(res)
+      setSelected(pack_id)
+      setPacks(prev => prev.map(p => p.pack_id === pack_id ? { ...p, has_run: true } : p))
+    } catch (e) {
+      setError(String(e))
+    } finally {
+      setRunning(false)
+    }
+  }
+
   if (loading) return <div className="text-slate-500 animate-pulse p-4">Loading…</div>
 
   return (
@@ -144,27 +164,41 @@ export function Scenarios() {
         <p className="text-sm text-slate-500 mt-1">Stress-test the portfolio with historical and hypothetical shocks.</p>
       </div>
 
+      {error && (
+        <div className="px-4 py-2 rounded-lg bg-rose-950/30 border border-rose-900/40 text-xs text-rose-400 font-mono">
+          {error}
+        </div>
+      )}
+
       {/* Pack picker */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
         {packs.map(pack => (
-          <button
+          <div
             key={pack.pack_id}
-            onClick={() => setSelected(pack.pack_id)}
-            className={`text-left p-4 rounded-xl border transition-colors ${
+            className={`relative p-4 rounded-xl border transition-colors cursor-pointer ${
               selected === pack.pack_id
                 ? 'border-blue-500 bg-blue-500/10'
                 : 'border-slate-800 bg-slate-900 hover:border-slate-600'
             }`}
+            onClick={() => pack.has_run && setSelected(pack.pack_id)}
           >
-            <div className="flex items-start justify-between mb-1">
+            <div className="flex items-start justify-between mb-1 gap-2">
               <span className="text-sm font-medium text-slate-200">{pack.display_name}</span>
               {pack.has_run
-                ? <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400">run</span>
-                : <span className="text-xs px-1.5 py-0.5 rounded bg-slate-800 text-slate-500">no run</span>
+                ? <span className="flex-shrink-0 text-xs px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400">run</span>
+                : <span className="flex-shrink-0 text-xs px-1.5 py-0.5 rounded bg-slate-800 text-slate-500">no run</span>
               }
             </div>
-            <p className="text-xs text-slate-600 font-mono">{pack.pack_type} &middot; {pack.pack_id}</p>
-          </button>
+            <p className="text-xs text-slate-600 font-mono mb-3">{pack.pack_type} &middot; {pack.pack_id}</p>
+            <button
+              onClick={e => { e.stopPropagation(); handleRun(pack.pack_id) }}
+              disabled={running}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 disabled:opacity-40"
+            >
+              <Play size={11} />
+              {running && selected === pack.pack_id ? 'Running…' : 'Run'}
+            </button>
+          </div>
         ))}
       </div>
 
@@ -196,9 +230,19 @@ export function Scenarios() {
             </div>
           </div>
         ) : (
-          <div className="p-5 rounded-xl border border-slate-800 bg-slate-900 text-sm text-slate-500">
-            No run found for <span className="font-mono text-slate-300">{selected}</span>.
-            Run <code className="text-slate-400">committee scenario {selected}</code> first.
+          <div className="p-5 rounded-xl border border-slate-800 bg-slate-900 flex items-center gap-4">
+            <div>
+              <p className="text-sm text-slate-400 font-medium mb-0.5">No run yet for <span className="font-mono text-slate-200">{selected}</span></p>
+              <p className="text-xs text-slate-600">Click Run on the pack above to execute this scenario.</p>
+            </div>
+            <button
+              onClick={() => handleRun(selected)}
+              disabled={running}
+              className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 transition-colors"
+            >
+              <Play size={13} />
+              {running ? 'Running…' : 'Run now'}
+            </button>
           </div>
         )
       )}

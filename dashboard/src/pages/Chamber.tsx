@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import {
   ShieldCheck, Rocket, Banknote, Globe, Cpu, LayoutGrid,
-  AlertTriangle, Columns3,
+  AlertTriangle, Columns3, RefreshCw,
 } from 'lucide-react'
-import { api, OracleCard, DissentRow, RivalObjection } from '../api'
+import { api, OracleCard, ChamberResponse, DissentRow, RivalObjection } from '../api'
 import { ORACLE_IDS, ORACLE_COLOR, ORACLE_DISPLAY, fmtScore, fmtPct, scoreColor, DIRECTION_COLOR } from '../constants'
 
 // ── Per-oracle identity metadata ──────────────────────────────────────────────
@@ -30,18 +30,6 @@ const ORACLE_PHILOSOPHY = {
 const ORACLE_SHORT = Object.fromEntries(
   Object.entries(ORACLE_DISPLAY).map(([id, name]) => [id, name.replace(/^The\s+/, '').split(' ')[0]])
 ) as Record<string, string>
-
-// ── Hook ──────────────────────────────────────────────────────────────────────
-
-function useChain<T>(loader: () => Promise<T>) {
-  const [data, setData] = useState<T | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-  useEffect(() => {
-    loader().then(setData).catch(e => setError(String(e))).finally(() => setLoading(false))
-  }, [])
-  return { data, error, loading }
-}
 
 // ── Oracle card ───────────────────────────────────────────────────────────────
 
@@ -418,7 +406,32 @@ function EmptyState({ error }: { error: string | null }) {
 // ── Chamber page ──────────────────────────────────────────────────────────────
 
 export function Chamber() {
-  const { data, error, loading } = useChain(() => api.getLatestChamber())
+  const [data, setData] = useState<ChamberResponse | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [convening, setConvening] = useState(false)
+  const [constraint, setConstraint] = useState('unconstrained')
+  const [profiles, setProfiles] = useState<string[]>(['unconstrained'])
+
+  useEffect(() => {
+    api.getLatestChamber().then(setData).catch(e => setError(String(e))).finally(() => setLoading(false))
+    api.getConfig().then(cfg => {
+      if (cfg.available_profiles.length > 0) setProfiles(cfg.available_profiles)
+    }).catch(() => {})
+  }, [])
+
+  const handleConvene = async () => {
+    setConvening(true)
+    setError(null)
+    try {
+      const result = await api.convene(constraint)
+      setData(result)
+    } catch (e) {
+      setError(String(e))
+    } finally {
+      setConvening(false)
+    }
+  }
 
   if (loading) return (
     <div className="flex items-center justify-center min-h-[60vh]">
@@ -433,7 +446,7 @@ export function Chamber() {
       </div>
     </div>
   )
-  if (error) return <EmptyState error={error} />
+  if (error && !data) return <EmptyState error={error} />
   if (!data) return null
 
   const abstainedOracles = new Set(
@@ -444,7 +457,7 @@ export function Chamber() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-semibold text-white">The Chamber</h1>
           <p className="text-sm text-slate-500 mt-1 font-mono">
@@ -452,19 +465,42 @@ export function Chamber() {
             {data.scenario_id && <span className="ml-2 text-violet-400">scenario: {data.scenario_id}</span>}
           </p>
         </div>
-        {/* Stat pill */}
-        <div className="flex-shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs font-mono">
-          <span className="text-slate-300 font-semibold">{data.oracle_cards.length}</span>
-          <span className="text-slate-600">oracles</span>
-          {abstainCount > 0 && (
-            <>
-              <span className="text-slate-700">·</span>
-              <span className="text-slate-500 font-semibold">{abstainCount}</span>
-              <span className="text-slate-600">abstain</span>
-            </>
-          )}
+        {/* Stat pill + convene controls */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs font-mono">
+            <span className="text-slate-300 font-semibold">{data.oracle_cards.length}</span>
+            <span className="text-slate-600">oracles</span>
+            {abstainCount > 0 && (
+              <>
+                <span className="text-slate-700">·</span>
+                <span className="text-slate-500 font-semibold">{abstainCount}</span>
+                <span className="text-slate-600">abstain</span>
+              </>
+            )}
+          </div>
+          <select
+            value={constraint}
+            onChange={e => setConstraint(e.target.value)}
+            disabled={convening}
+            className="bg-slate-900 border border-slate-700 text-slate-300 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none disabled:opacity-50 font-mono"
+          >
+            {profiles.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+          <button
+            onClick={handleConvene}
+            disabled={convening}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 disabled:opacity-50"
+          >
+            <RefreshCw size={13} className={convening ? 'animate-spin' : ''} />
+            {convening ? 'Convening…' : 'Re-convene'}
+          </button>
         </div>
       </div>
+      {error && (
+        <div className="px-4 py-2 rounded-lg bg-rose-950/30 border border-rose-900/40 text-xs text-rose-400 font-mono">
+          {error}
+        </div>
+      )}
 
       {/* Oracle Cards */}
       <section>
