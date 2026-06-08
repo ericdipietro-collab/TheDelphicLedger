@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 155" fill="none">
+  <!-- Pediment gable — the oracle's ideal, unreachable by any one voice -->
+  <polyline points="16,38 140,6 264,38" stroke="#94A3B8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="140" cy="6" r="2.5" fill="#94A3B8"/>
+
+  <!-- Value Purist — amber -->
+  <rect x="44" y="62" width="22" height="56" fill="#F59E0B" opacity="0.9"/>
+  <rect x="41" y="55" width="28" height="8" rx="1.5" fill="#F59E0B"/>
+  <rect x="41" y="115" width="28" height="4" rx="1" fill="#FCD34D"/>
+
+  <!-- Growth Visionary — emerald (tallest: reaches the pediment) -->
+  <rect x="78" y="38" width="22" height="80" fill="#10B981" opacity="0.9"/>
+  <rect x="75" y="31" width="28" height="8" rx="1.5" fill="#10B981"/>
+  <rect x="75" y="115" width="28" height="4" rx="1" fill="#6EE7B7"/>
+
+  <!-- Yield Harvester — sky (shortest) -->
+  <rect x="112" y="72" width="22" height="46" fill="#0EA5E9" opacity="0.9"/>
+  <rect x="109" y="65" width="28" height="8" rx="1.5" fill="#0EA5E9"/>
+  <rect x="109" y="115" width="28" height="4" rx="1" fill="#7DD3FC"/>
+
+  <!-- Macro Tactician — violet -->
+  <rect x="146" y="48" width="22" height="70" fill="#8B5CF6" opacity="0.9"/>
+  <rect x="143" y="41" width="28" height="8" rx="1.5" fill="#8B5CF6"/>
+  <rect x="143" y="115" width="28" height="4" rx="1" fill="#C4B5FD"/>
+
+  <!-- The Quant — rose -->
+  <rect x="180" y="66" width="22" height="52" fill="#F43F5E" opacity="0.9"/>
+  <rect x="177" y="59" width="28" height="8" rx="1.5" fill="#F43F5E"/>
+  <rect x="177" y="115" width="28" height="4" rx="1" fill="#FDA4AF"/>
+
+  <!-- Passive Pragmatist — slate -->
+  <rect x="214" y="56" width="22" height="62" fill="#64748B" opacity="0.9"/>
+  <rect x="211" y="49" width="28" height="8" rx="1.5" fill="#64748B"/>
+  <rect x="211" y="115" width="28" height="4" rx="1" fill="#CBD5E1"/>
+
+  <!-- Entablature -->
+  <rect x="12" y="118" width="256" height="7" rx="1" fill="#94A3B8"/>
+
+  <!-- Stylobate (two steps) -->
+  <rect x="6" y="129" width="268" height="6" rx="1" fill="#94A3B8" opacity="0.7"/>
+  <rect x="0" y="139" width="280" height="6" rx="1" fill="#94A3B8" opacity="0.5"/>
+</svg>

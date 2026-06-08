@@ -1,10 +1,21 @@
+<div align="center">
+
+<img src="docs/logo.svg" alt="The Delphic Ledger" width="220"/>
+
 # The Delphic Ledger
 
-[![CI](https://github.com/ericdipietro-collab/TheDelphicLedger/actions/workflows/ci.yml/badge.svg)](https://github.com/ericdipietro-collab/TheDelphicLedger/actions/workflows/ci.yml)
-
-> **"Know thy holdings."** — after the inscription at the Temple of Apollo at Delphi
+> *"Know thy holdings."* — after the inscription at the Temple of Apollo at Delphi
 
 **Six oracles. Zero consensus. No predictions.**
+
+[![CI](https://github.com/ericdipietro-collab/TheDelphicLedger/actions/workflows/ci.yml/badge.svg)](https://github.com/ericdipietro-collab/TheDelphicLedger/actions/workflows/ci.yml)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)](https://python.org)
+[![License: MIT](https://img.shields.io/badge/license-MIT-22c55e)](LICENSE)
+[![uv](https://img.shields.io/badge/uv-package%20manager-7C3AED)](https://github.com/astral-sh/uv)
+
+</div>
+
+---
 
 A personal portfolio analysis tool and engineering showcase. Import real positions and transactions from broker CSVs, reconcile them against a transaction ledger, enrich them with market data and SEC filings, then convene six investor archetypes who score the portfolio through incompatible philosophies and propose conflicting rebalancing trades.
 
@@ -24,9 +35,13 @@ The disagreement is not a bug to be resolved. It's the point. Real investors dis
 
 ## Dashboard
 
+<div align="center">
+
 | The Chamber | Portfolio |
-|---|---|
+|:---:|:---:|
 | ![The Chamber — six oracle verdicts, dissent matrix, rivals' objections](docs/screenshots/dashboard-chamber.png) | ![Portfolio — allocation donut, drift bar chart, holdings table](docs/screenshots/dashboard-portfolio.png) |
+
+</div>
 
 ---
 
