@@ -15,14 +15,17 @@ function useChain<T>(loader: () => Promise<T>) {
 function OracleCardView({ card }: { card: OracleCard }) {
   const color = ORACLE_COLOR[card.oracle_id] ?? '#64748b'
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900 overflow-hidden">
-      {/* Colored header bar */}
-      <div className="h-1" style={{ background: color }} />
+    <div
+      className="rounded-xl border bg-slate-900 overflow-hidden"
+      style={{ borderColor: `${color}40` }}
+    >
+      {/* Colored header band */}
+      <div className="h-1.5" style={{ background: color }} />
       <div className="p-4">
         <div className="flex items-start justify-between mb-3">
           <div>
-            <p className="text-xs text-slate-500 font-mono uppercase tracking-wider">{card.oracle_id}</p>
-            <h3 className="text-sm font-semibold text-white mt-0.5">{card.display_name}</h3>
+            <h3 className="text-sm font-semibold mt-0.5" style={{ color }}>{card.display_name}</h3>
+            <p className="text-xs text-slate-600 font-mono uppercase tracking-wider mt-0.5">{card.oracle_id}</p>
           </div>
           {card.abstained ? (
             <span className="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-500">abstain</span>

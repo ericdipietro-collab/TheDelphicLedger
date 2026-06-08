@@ -14,9 +14,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
     <div className="flex h-screen overflow-hidden">
       {/* Sidebar */}
       <aside className="w-52 flex-shrink-0 bg-slate-900 border-r border-slate-800 flex flex-col">
-        <div className="px-5 py-5 border-b border-slate-800">
-          <div className="text-xs font-mono text-slate-500 uppercase tracking-widest mb-0.5">Delphic</div>
-          <div className="text-lg font-semibold text-white leading-tight">Ledger</div>
+        <div className="px-4 py-4 border-b border-slate-800 flex items-center gap-3">
+          <img src="/logo.svg" alt="The Delphic Ledger" className="w-10 h-7 flex-shrink-0" />
+          <div>
+            <div className="text-xs font-mono text-slate-500 uppercase tracking-widest leading-none">The Delphic</div>
+            <div className="text-sm font-semibold text-white leading-tight">Ledger</div>
+          </div>
         </div>
         <nav className="flex-1 px-2 py-3 space-y-0.5">
           {NAV.map(({ to, label, icon }) => (

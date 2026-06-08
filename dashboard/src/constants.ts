@@ -22,7 +22,7 @@ export const ORACLE_COLOR: Record<string, string> = {
   yield_harvester:    '#0ea5e9',
   macro_tactician:    '#8b5cf6',
   quant:              '#f43f5e',
-  passive_pragmatist: '#94a3b8',
+  passive_pragmatist: '#64748b',
 }
 
 export const SLEEVE_LABELS: Record<string, string> = {
