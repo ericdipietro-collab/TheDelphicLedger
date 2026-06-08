@@ -1,0 +1,13 @@
+id: watchlist
+description: "Personal watchlist — add tickers you want to track alongside your holdings"
+source: explicit
+refresh_policy: on_demand
+enabled_default: false
+# Add your tickers below. Optionally specify a sleeve for each.
+# Examples:
+#   - ticker: AAPL
+#     sleeve: equity_us
+#   - ticker: BRK/B
+#   - ticker: VTSAX
+#     sleeve: equity_us
+tickers: []

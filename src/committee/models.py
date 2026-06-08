@@ -248,6 +248,18 @@ class Decision(Base):
     regime_state: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
+class BundleState(Base):
+    """Mutable state for each bundle (enabled/disabled, last refresh)."""
+
+    __tablename__ = "bundle_state"
+
+    id: Mapped[str] = mapped_column(Text, primary_key=True)
+    enabled: Mapped[bool] = mapped_column(Integer, nullable=False, default=False)
+    last_refreshed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    instrument_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
 class Deviation(Base):
     """User deviation from committee recommendation (M7)."""
 

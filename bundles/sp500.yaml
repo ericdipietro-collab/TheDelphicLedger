@@ -1,0 +1,12 @@
+id: sp500
+description: "S&P 500 constituents via iShares IVV daily holdings CSV (index proxy)"
+source: index_proxy
+refresh_policy: nightly
+enabled_default: false
+size_estimate: 505
+index_proxy:
+  # Download the current holdings CSV from iShares and place it locally,
+  # or point this URL at the live iShares download endpoint.
+  # Example: https://www.ishares.com/us/products/239726/.../IVV_holdings.csv
+  url: "https://www.ishares.com/us/products/239726/ISHARES-CORE-SP-500-ETF/1467271812596.ajax?fileType=csv&fileName=IVV_holdings&dataType=fund"
+  template: "iShares Holdings"

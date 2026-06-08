@@ -10,10 +10,13 @@ from rich.console import Console
 from rich.table import Table
 
 app = typer.Typer(name="committee", add_completion=False)
+universe_app = typer.Typer(name="universe", help="Manage the instrument universe (bundles).")
+app.add_typer(universe_app, name="universe")
 console = Console()
 
 _DB_PATH_OPT = typer.Option(Path("data/ledger.db"), "--db", help="SQLite database path")
 _PROFILES_OPT = typer.Option(Path("profiles"), "--profiles", help="Profiles directory")
+_BUNDLES_OPT = typer.Option(Path("bundles"), "--bundles", help="Bundles directory")
 
 
 @app.command()
@@ -379,6 +382,177 @@ def template_import(
         raise typer.Exit(1) from None
     path = save_template(tmpl, profiles)
     console.print(f"[green]Template '{tmpl.name}' saved → {path}[/green]")
+
+
+# ── Universe commands ──────────────────────────────────────────────────────────
+
+@universe_app.command("enable")
+def universe_enable(
+    bundle_id: str = typer.Argument(..., help="Bundle ID to enable"),
+    db: Path = _DB_PATH_OPT,
+    bundles: Path = _BUNDLES_OPT,
+    cap: int = typer.Option(3000, "--cap", help="Instrument cap override"),
+) -> None:
+    """Enable a bundle (adds it to the active universe)."""
+    from committee.db import get_session, init_db
+    from committee.universe.loader import load_bundle_config
+    from committee.universe.manager import enable_bundle
+
+    cfg = load_bundle_config(bundle_id, bundles)
+    if cfg is None:
+        console.print(f"[red]Bundle '{bundle_id}' not found in {bundles}[/red]")
+        raise typer.Exit(1)
+
+    init_db(db)
+    gen = get_session()
+    session = next(gen)
+    try:
+        status, msg = enable_bundle(session, cfg, cap=cap)
+        if status == "refuse":
+            console.print(f"[red]{msg}[/red]")
+            raise typer.Exit(1)
+        style = "yellow" if status == "warn" else "green"
+        console.print(f"[{style}]{msg}[/{style}]")
+        session.commit()
+    except SystemExit:
+        raise
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        with contextlib.suppress(StopIteration):
+            next(gen)
+
+
+@universe_app.command("disable")
+def universe_disable(
+    bundle_id: str = typer.Argument(..., help="Bundle ID to disable"),
+    db: Path = _DB_PATH_OPT,
+) -> None:
+    """Disable a bundle (removes it from the active universe)."""
+    from committee.db import get_session, init_db
+    from committee.universe.manager import disable_bundle
+
+    init_db(db)
+    gen = get_session()
+    session = next(gen)
+    try:
+        msg = disable_bundle(session, bundle_id)
+        console.print(f"[green]{msg}[/green]")
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        with contextlib.suppress(StopIteration):
+            next(gen)
+
+
+@universe_app.command("refresh")
+def universe_refresh(
+    bundle_id: str | None = typer.Argument(default=None, help="Bundle ID (omit for all enabled)"),
+    db: Path = _DB_PATH_OPT,
+    bundles: Path = _BUNDLES_OPT,
+    profiles: Path = _PROFILES_OPT,
+) -> None:
+    """Refresh bundle instrument membership (resolve + tag instruments)."""
+    from committee.db import get_session, init_db
+    from committee.models import BundleState
+    from committee.universe.loader import load_bundle_config, load_bundle_configs
+    from committee.universe.manager import refresh_bundle
+
+    init_db(db)
+    gen = get_session()
+    session = next(gen)
+    try:
+        if bundle_id:
+            cfg = load_bundle_config(bundle_id, bundles)
+            if cfg is None:
+                console.print(f"[red]Bundle '{bundle_id}' not found in {bundles}[/red]")
+                raise typer.Exit(1)
+            targets = [cfg]
+        else:
+            all_cfgs = load_bundle_configs(bundles)
+            enabled_ids = {
+                s.id
+                for s in session.query(BundleState).filter(BundleState.enabled.is_(True)).all()
+            }
+            targets = [c for c in all_cfgs if c.id in enabled_ids]
+            if not targets:
+                console.print("[yellow]No enabled bundles to refresh.[/yellow]")
+                raise typer.Exit(0)
+
+        for cfg in targets:
+            console.print(f"  Refreshing [bold]{cfg.id}[/bold]…", end=" ")
+            count, err = refresh_bundle(session, cfg, profiles_dir=profiles)
+            if err:
+                console.print(f"[red]error: {err}[/red]")
+            else:
+                console.print(f"[green]{count} instruments tagged[/green]")
+
+        session.commit()
+    except SystemExit:
+        raise
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        with contextlib.suppress(StopIteration):
+            next(gen)
+
+
+@universe_app.command("status")
+def universe_status(
+    db: Path = _DB_PATH_OPT,
+    bundles: Path = _BUNDLES_OPT,
+) -> None:
+    """Show the status of all bundles."""
+    from committee.db import get_session, init_db
+    from committee.universe.guard import active_universe_size
+    from committee.universe.loader import load_bundle_configs
+    from committee.universe.manager import get_all_states
+
+    init_db(db)
+    gen = get_session()
+    session = next(gen)
+    try:
+        configs = load_bundle_configs(bundles)
+        states = get_all_states(session)
+        current_size = active_universe_size(session)
+
+        tbl = Table(title=f"Universe bundles  (active ~{current_size}/3000)", show_lines=False)
+        tbl.add_column("Bundle", style="bold")
+        tbl.add_column("Source")
+        tbl.add_column("Refresh")
+        tbl.add_column("~Size", justify="right")
+        tbl.add_column("Enabled")
+        tbl.add_column("Instruments", justify="right")
+        tbl.add_column("Last Refresh")
+        tbl.add_column("Error")
+
+        for cfg in configs:
+            state = states.get(cfg.id)
+            enabled = state.enabled if state else cfg.enabled_default
+            count = state.instrument_count if state else 0
+            refreshed = (
+                state.last_refreshed_at.strftime("%Y-%m-%d %H:%M") if (state and state.last_refreshed_at) else "—"
+            )
+            error = (state.last_error or "")[:40] if state else ""
+            tbl.add_row(
+                cfg.id,
+                cfg.source,
+                cfg.refresh_policy,
+                str(cfg.size_estimate or "?"),
+                "[green]yes[/green]" if enabled else "[dim]no[/dim]",
+                str(count),
+                refreshed,
+                f"[red]{error}[/red]" if error else "—",
+            )
+
+        console.print(tbl)
+    finally:
+        with contextlib.suppress(StopIteration):
+            next(gen)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,11 @@
+id: dow30
+description: "Dow Jones Industrial Average constituents via SPDR DIA daily holdings CSV"
+source: index_proxy
+refresh_policy: nightly
+enabled_default: false
+size_estimate: 30
+index_proxy:
+  # Download the DIA holdings CSV from SPDR (ssga.com) and place it locally,
+  # or point this URL at the live SPDR download endpoint.
+  url: "https://www.ssga.com/us/en/individual/etfs/funds/spdr-dow-jones-industrial-average-etf-trust-dia"
+  template: "SPDR Holdings"

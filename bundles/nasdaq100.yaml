@@ -1,0 +1,15 @@
+id: nasdaq100
+description: "Nasdaq-100 constituents via Invesco QQQ daily holdings CSV (NOT the full Nasdaq Composite)"
+source: index_proxy
+refresh_policy: nightly
+enabled_default: false
+size_estimate: 102
+# NOTE: This is the Nasdaq-100 (QQQ, ~100 large-cap tech companies), NOT the
+# full Nasdaq Composite (~3,400 names). The full Composite is explicit opt-in
+# only and is never shipped as an enabled bundle — enabling it would far exceed
+# the default 3,000-instrument cap.
+index_proxy:
+  # Download the QQQ holdings CSV from Invesco and place it locally,
+  # or point this URL at the live Invesco download endpoint.
+  url: "https://www.invesco.com/us/financial-products/etfs/holdings/main/holdings/0?audienceType=Investor&ticker=QQQ"
+  template: "Invesco Holdings"

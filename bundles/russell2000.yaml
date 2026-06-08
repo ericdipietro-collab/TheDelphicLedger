@@ -1,0 +1,15 @@
+id: russell2000
+description: "Russell 2000 small-cap constituents via iShares IWM daily holdings CSV"
+source: index_proxy
+# on_demand: ~2,000 instruments; nightly EDGAR fetches would exhaust the 10 req/s limit.
+# Run 'committee universe refresh russell2000' manually when needed.
+refresh_policy: on_demand
+enabled_default: false
+size_estimate: 2000
+# WARNING: Enabling this bundle will grow the universe by ~2,000 instruments.
+# Combined with sp500 + nasdaq100 it will approach the 3,000-instrument cap.
+index_proxy:
+  # Download the IWM holdings CSV from iShares and place it locally,
+  # or point this URL at the live iShares download endpoint.
+  url: "https://www.ishares.com/us/products/239710/ISHARES-RUSSELL-2000-ETF/1467271812596.ajax?fileType=csv&fileName=IWM_holdings&dataType=fund"
+  template: "iShares Holdings"

@@ -1,0 +1,101 @@
+id: etf_core
+description: "~80 liquid ETFs across all major sleeves — the funds-only default universe"
+source: explicit
+refresh_policy: nightly
+enabled_default: true
+size_estimate: 80
+tickers:
+  # US Equity — Broad market
+  - ticker: SPY
+  - ticker: IVV
+  - ticker: VOO
+  - ticker: VTI
+  - ticker: SCHB
+  - ticker: ITOT
+  # US Equity — Market cap segments
+  - ticker: IWB
+  - ticker: MDY
+  - ticker: IJH
+  - ticker: IJR
+  - ticker: RSP
+  # US Equity — Growth / Value / Quality factor
+  - ticker: QQQ
+  - ticker: VUG
+  - ticker: IWF
+  - ticker: SCHG
+  - ticker: MGK
+  - ticker: VTV
+  - ticker: IWD
+  - ticker: SCHV
+  - ticker: QUAL
+  # US Equity — Dividend / Income
+  - ticker: VYM
+  - ticker: HDV
+  - ticker: DVY
+  - ticker: SCHD
+  - ticker: SDY
+  - ticker: NOBL
+  - ticker: DGRO
+  # US Equity — Sector (11 SPDR sectors + select thematic)
+  - ticker: XLK
+  - ticker: XLV
+  - ticker: XLF
+  - ticker: XLY
+  - ticker: XLC
+  - ticker: XLE
+  - ticker: XLU
+  - ticker: XLI
+  - ticker: XLB
+  - ticker: XLRE
+  - ticker: XLP
+  - ticker: VNQ
+  # International Equity — Developed markets
+  - ticker: VEA
+  - ticker: IEFA
+  - ticker: EFA
+  - ticker: SCHF
+  - ticker: EWJ
+  - ticker: FEZ
+  - ticker: HEDJ
+  # International Equity — Emerging markets
+  - ticker: VWO
+  - ticker: EEM
+  - ticker: IEMG
+  - ticker: MCHI
+  # International Equity — Broad (all-world)
+  - ticker: VEU
+  - ticker: VXUS
+  - ticker: ACWI
+  # Fixed Income — Aggregate
+  - ticker: AGG
+  - ticker: BND
+  # Fixed Income — Government
+  - ticker: TLT
+  - ticker: IEF
+  - ticker: SHY
+  - ticker: GOVT
+  - ticker: VGLT
+  - ticker: SCHO
+  - ticker: SGOV
+  # Fixed Income — Corporate
+  - ticker: LQD
+  - ticker: VCIT
+  - ticker: VCSH
+  - ticker: MBB
+  # Fixed Income — High Yield
+  - ticker: HYG
+  - ticker: JNK
+  - ticker: BKLN
+  # Fixed Income — Inflation-protected
+  - ticker: TIP
+  - ticker: SCHP
+  # Fixed Income — International
+  - ticker: BNDX
+  - ticker: EMB
+  # Alternatives — Commodities / Real Assets
+  - ticker: GLD
+  - ticker: IAU
+  - ticker: SLV
+  - ticker: GDX
+  - ticker: PDBC
+  - ticker: AMLP

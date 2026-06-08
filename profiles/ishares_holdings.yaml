@@ -1,0 +1,10 @@
+column_map:
+  Market Value: market_value
+  Name: name
+  Price: price
+  Shares Held: qty
+  Ticker: symbol
+file_type: positions
+fingerprint: ishares_holdings
+name: iShares Holdings
+type_aliases: {}

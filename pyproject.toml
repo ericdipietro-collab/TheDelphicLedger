@@ -10,6 +10,7 @@ dependencies = [
     "pyyaml>=6",
     "python-dateutil>=2.9",
     "requests>=2.32",
+    "yfinance>=0.2",
 ]
 
 [project.optional-dependencies]
@@ -19,6 +20,7 @@ dev = [
     "ruff>=0.5",
     "sqlalchemy[mypy]>=2.0",
     "import-linter>=2",
+    "responses>=0.25",
 ]
 
 [project.scripts]

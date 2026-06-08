@@ -1,0 +1,99 @@
+{
+  "cik": 320193,
+  "entityName": "Apple Inc.",
+  "facts": {
+    "us-gaap": {
+      "Revenues": {
+        "label": "Net Sales",
+        "description": "Amount of revenue recognized.",
+        "units": {
+          "USD": [
+            {
+              "accn": "0000320193-22-000108",
+              "cik": 320193,
+              "entityName": "Apple Inc.",
+              "loc": "US-CA",
+              "end": "2022-09-24",
+              "val": 394328000000,
+              "accn": "0000320193-22-000108",
+              "form": "10-K",
+              "filed": "2022-10-28",
+              "frame": "CY2022"
+            },
+            {
+              "accn": "0000320193-23-000106",
+              "cik": 320193,
+              "entityName": "Apple Inc.",
+              "loc": "US-CA",
+              "end": "2023-09-30",
+              "val": 383285000000,
+              "form": "10-K",
+              "filed": "2023-11-03",
+              "frame": "CY2023"
+            }
+          ]
+        }
+      },
+      "EarningsPerShareDiluted": {
+        "label": "EPS Diluted",
+        "units": {
+          "USD/shares": [
+            {
+              "accn": "0000320193-23-000106",
+              "cik": 320193,
+              "end": "2023-09-30",
+              "val": 6.13,
+              "form": "10-K",
+              "filed": "2023-11-03"
+            }
+          ]
+        }
+      },
+      "StockholdersEquity": {
+        "label": "Total Equity",
+        "units": {
+          "USD": [
+            {
+              "accn": "0000320193-23-000106",
+              "cik": 320193,
+              "end": "2023-09-30",
+              "val": 62146000000,
+              "form": "10-K",
+              "filed": "2023-11-03"
+            }
+          ]
+        }
+      },
+      "NetCashProvidedByUsedInOperatingActivities": {
+        "label": "Cash from Operations",
+        "units": {
+          "USD": [
+            {
+              "accn": "0000320193-23-000106",
+              "cik": 320193,
+              "end": "2023-09-30",
+              "val": 110543000000,
+              "form": "10-K",
+              "filed": "2023-11-03"
+            }
+          ]
+        }
+      },
+      "PaymentsToAcquirePropertyPlantAndEquipment": {
+        "label": "Capital Expenditures",
+        "units": {
+          "USD": [
+            {
+              "accn": "0000320193-23-000106",
+              "cik": 320193,
+              "end": "2023-09-30",
+              "val": 10959000000,
+              "form": "10-K",
+              "filed": "2023-11-03"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

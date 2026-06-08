@@ -1,0 +1,10 @@
+column_map:
+  Market Value: market_value
+  Name: name
+  Shares/Units: qty
+  Ticker: symbol
+  Weight: null
+file_type: positions
+fingerprint: invesco_holdings
+name: Invesco Holdings
+type_aliases: {}

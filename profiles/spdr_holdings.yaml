@@ -1,0 +1,11 @@
+column_map:
+  Market Value: market_value
+  Name: name
+  Price: price
+  Shares: qty
+  Symbol: symbol
+  Weight: null
+file_type: positions
+fingerprint: spdr_holdings
+name: SPDR Holdings
+type_aliases: {}

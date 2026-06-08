@@ -1,0 +1,10 @@
+iShares Core S&P 500 ETF
+Fund Holdings as of,"Jun 06, 2026"
+Shares Outstanding,"808,690,000"
+,,,,
+Ticker,ISIN,Asset Class,Name,Sector,Weight (%),Price,Shares Held,Market Value
+AAPL,US0378331005,Equity,APPLE INC,Information Technology,7.08,189.30,"264,640,000","$50,068,992,000"
+MSFT,US5949181045,Equity,MICROSOFT CORP,Information Technology,7.03,412.43,"123,590,000","$50,965,741,700"
+NVDA,US67066G1040,Equity,NVIDIA CORP,Information Technology,6.51,475.00,"95,500,000","$45,362,500,000"
+AMZN,US0231351067,Equity,AMAZON COM INC,Consumer Discretionary,3.68,182.50,"140,200,000","$25,586,500,000"
+GOOGL,US02079K3059,Equity,ALPHABET INC CLASS A,Communication Services,2.10,175.50,"83,600,000","$14,671,800,000"
