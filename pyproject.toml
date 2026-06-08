@@ -38,8 +38,8 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/ericdipietro-collab/DelphiLedger"
-Repository = "https://github.com/ericdipietro-collab/DelphiLedger"
+Homepage = "https://github.com/ericdipietro-collab/TheDelphicLedger"
+Repository = "https://github.com/ericdipietro-collab/TheDelphicLedger"
 
 [project.scripts]
 committee = "committee.cli:app"

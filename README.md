@@ -1,6 +1,6 @@
 # The Delphic Ledger
 
-[![CI](https://github.com/ericdipietro-collab/DelphiLedger/actions/workflows/ci.yml/badge.svg)](https://github.com/ericdipietro-collab/DelphiLedger/actions/workflows/ci.yml)
+[![CI](https://github.com/ericdipietro-collab/TheDelphicLedger/actions/workflows/ci.yml/badge.svg)](https://github.com/ericdipietro-collab/TheDelphicLedger/actions/workflows/ci.yml)
 
 > **"Know thy holdings."** — after the inscription at the Temple of Apollo at Delphi
 
@@ -131,7 +131,7 @@ Fails any criterion → Macro Tactician falls back to neutral allocation and is 
 ## Installation
 
 ```bash
-git clone https://github.com/ericdipietro-collab/DelphiLedger
+git clone https://github.com/ericdipietro-collab/TheDelphicLedger
 cd DelphiLedger
 uv sync
 uv run committee --help
