@@ -1,7 +1,37 @@
 import { useEffect, useState } from 'react'
-import { AlertTriangle, Columns3 } from 'lucide-react'
+import {
+  ShieldCheck, Rocket, Banknote, Globe, Cpu, LayoutGrid,
+  AlertTriangle, Columns3,
+} from 'lucide-react'
 import { api, OracleCard, DissentRow, RivalObjection } from '../api'
 import { ORACLE_IDS, ORACLE_COLOR, ORACLE_DISPLAY, fmtScore, fmtPct, scoreColor, DIRECTION_COLOR } from '../constants'
+
+// ── Per-oracle identity metadata ──────────────────────────────────────────────
+
+const ORACLE_ICON = {
+  value_purist:       ShieldCheck,
+  growth_visionary:   Rocket,
+  yield_harvester:    Banknote,
+  macro_tactician:    Globe,
+  quant:              Cpu,
+  passive_pragmatist: LayoutGrid,
+} as Record<string, React.ElementType>
+
+const ORACLE_PHILOSOPHY = {
+  value_purist:       { tagline: 'Margin of safety',    metrics: 'P/E · P/B · FCF · D/E' },
+  growth_visionary:   { tagline: 'Category winners',    metrics: 'Rev YoY · Margin · Mom.' },
+  yield_harvester:    { tagline: 'The check clears',    metrics: 'Distribution · Payout' },
+  macro_tactician:    { tagline: 'Regime-aware ballast', metrics: 'T10Y3M · CPI · DXY · VIX' },
+  quant:              { tagline: 'Humans are biased',   metrics: 'RSI · MA · 12-1 · β' },
+  passive_pragmatist: { tagline: 'Cost & concentration', metrics: 'Expense · HHI · Turnover' },
+} as Record<string, { tagline: string; metrics: string }>
+
+// Strip leading "The " so "The Quant" → "Quant" in compact contexts
+const ORACLE_SHORT = Object.fromEntries(
+  Object.entries(ORACLE_DISPLAY).map(([id, name]) => [id, name.replace(/^The\s+/, '').split(' ')[0]])
+) as Record<string, string>
+
+// ── Hook ──────────────────────────────────────────────────────────────────────
 
 function useChain<T>(loader: () => Promise<T>) {
   const [data, setData] = useState<T | null>(null)
@@ -13,58 +43,69 @@ function useChain<T>(loader: () => Promise<T>) {
   return { data, error, loading }
 }
 
+// ── Oracle card ───────────────────────────────────────────────────────────────
+
 function OracleCardView({ card }: { card: OracleCard }) {
   const color = ORACLE_COLOR[card.oracle_id] ?? '#64748b'
-  return (
-    <div
-      className="rounded-xl overflow-hidden flex flex-col"
-      style={{
-        background: `linear-gradient(160deg, ${color}12 0%, #0f172a 40%)`,
-        border: `1px solid ${color}30`,
-        boxShadow: `0 0 0 0 transparent, inset 0 1px 0 ${color}20`,
-      }}
-    >
-      {/* Thick colored header band */}
-      <div
-        className="h-[3px] flex-shrink-0"
-        style={{ background: color }}
-      />
+  const Icon = ORACLE_ICON[card.oracle_id] ?? LayoutGrid
+  const meta = ORACLE_PHILOSOPHY[card.oracle_id]
 
-      {/* Oracle identity */}
-      <div
-        className="px-4 pt-3 pb-2.5 flex items-start justify-between"
-        style={{ borderBottom: `1px solid ${color}18` }}
+  return (
+    <article
+      className="rounded-2xl overflow-hidden flex flex-col bg-slate-900"
+      style={{ border: `1px solid ${color}33` }}
+    >
+      {/* Identity header — gradient-tinted, icon tile + name */}
+      <header
+        className="flex items-center gap-3 p-4"
+        style={{
+          background: `linear-gradient(180deg, ${color}1f 0%, transparent 100%)`,
+          borderBottom: `1px solid ${color}22`,
+        }}
       >
-        <div className="flex items-center gap-2.5 min-w-0">
-          {/* Color swatch dot */}
-          <span
-            className="flex-shrink-0 w-2.5 h-2.5 rounded-full mt-0.5"
-            style={{ background: color, boxShadow: `0 0 6px ${color}80` }}
-          />
-          <div className="min-w-0">
-            <h3 className="text-base font-bold leading-tight tracking-tight" style={{ color }}>
-              {card.display_name}
-            </h3>
-            <p className="text-[10px] text-slate-600 font-mono uppercase tracking-widest mt-0.5 truncate">
-              {card.oracle_id}
-            </p>
-          </div>
+        <div
+          className="flex-shrink-0 w-10 h-10 grid place-items-center rounded-xl"
+          style={{ color, background: `${color}26`, border: `1px solid ${color}4d` }}
+        >
+          <Icon size={20} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p
+            className="font-mono text-[10px] tracking-[0.17em] uppercase mb-0.5"
+            style={{ color }}
+          >
+            {card.oracle_id}
+          </p>
+          <h3 className="text-[15px] font-bold text-slate-100 leading-tight truncate">
+            {card.display_name}
+          </h3>
         </div>
         {card.abstained ? (
           <span
-            className="text-xs px-2 py-0.5 rounded-full font-mono flex-shrink-0 ml-2"
-            style={{ background: `${color}18`, color: `${color}bb`, border: `1px solid ${color}30` }}
+            className="flex-shrink-0 text-xs px-2 py-0.5 rounded-full font-mono"
+            style={{ background: '#64748b22', color: '#94a3b8', border: '1px solid #64748b44' }}
           >
-            abstain
+            Abstain
           </span>
         ) : (
-          <span className="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 flex-shrink-0 ml-2 font-mono">
-            {card.scored_count} scored
+          <span
+            className="flex-shrink-0 text-xs px-2 py-0.5 rounded-full font-mono"
+            style={{ background: `${color}22`, color: `${color}cc`, border: `1px solid ${color}44` }}
+          >
+            {card.scored_count} Scored
           </span>
         )}
-      </div>
+      </header>
 
       <div className="p-4 flex-1 space-y-3">
+        {/* Philosophy + metrics tagline */}
+        {meta && (
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-slate-400 italic">{meta.tagline}</span>
+            <span className="text-slate-600 font-mono text-[10px]">{meta.metrics}</span>
+          </div>
+        )}
+
         {card.regime_state && (
           <div
             className="px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-2"
@@ -75,52 +116,99 @@ function OracleCardView({ card }: { card: OracleCard }) {
           </div>
         )}
 
-        {/* Top scores */}
-        <div className="space-y-1.5">
-          {card.top_scores.length === 0 ? (
-            <p className="text-xs text-slate-600 italic">No scores available.</p>
-          ) : (
-            card.top_scores.map(hs => (
-              <div key={hs.instrument_id} className="flex items-center justify-between gap-2">
-                <span className="text-xs text-slate-400 font-mono w-14 flex-shrink-0">#{hs.instrument_id}</span>
-                <div className="flex-1 h-1 rounded-full bg-slate-800 overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{
-                      width: `${Math.abs((hs.score ?? 0) * 50) + 50}%`,
-                      background: scoreColor(hs.score),
-                      marginLeft: (hs.score ?? 0) < 0 ? 'auto' : undefined,
-                    }}
-                  />
+        {/* Abstain panel or conviction list */}
+        {card.abstained ? (
+          <div
+            className="rounded-lg p-3 text-xs space-y-1.5"
+            style={{ background: '#0f172a', border: '1px solid #1e293b' }}
+          >
+            <p className="text-slate-400 font-medium">Recusing — insufficient data</p>
+            {card.abstain_reason && (
+              <p className="text-slate-600 leading-relaxed">{card.abstain_reason}</p>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {card.top_scores.length === 0 ? (
+              <p className="text-xs text-slate-600 italic">No scores available.</p>
+            ) : (
+              card.top_scores.map(hs => (
+                <div key={hs.instrument_id} className="space-y-0.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs text-slate-400 font-mono w-14 flex-shrink-0">
+                      #{hs.instrument_id}
+                    </span>
+                    <div className="flex-1 h-1.5 rounded-full bg-slate-950 flex overflow-hidden">
+                      <span className="w-1/2 flex justify-end">
+                        {(hs.score ?? 0) < 0 && (
+                          <i
+                            className="block h-full rounded-l"
+                            style={{
+                              width: `${Math.min(Math.abs(hs.score ?? 0) * 100, 100)}%`,
+                              background: scoreColor(hs.score),
+                            }}
+                          />
+                        )}
+                      </span>
+                      <span className="w-1/2 flex">
+                        {(hs.score ?? 0) > 0 && (
+                          <i
+                            className="block h-full rounded-r"
+                            style={{
+                              width: `${Math.min((hs.score ?? 0) * 100, 100)}%`,
+                              background: scoreColor(hs.score),
+                            }}
+                          />
+                        )}
+                      </span>
+                    </div>
+                    <span
+                      className="text-xs font-mono tabular w-10 text-right flex-shrink-0"
+                      style={{ color: scoreColor(hs.score) }}
+                    >
+                      {fmtScore(hs.score)}
+                    </span>
+                  </div>
+                  {hs.reasons[0] && (
+                    <p className="text-[10px] text-slate-600 pl-16 leading-tight truncate">
+                      {hs.reasons[0]}
+                    </p>
+                  )}
                 </div>
-                <span className="text-xs font-mono tabular w-10 text-right flex-shrink-0" style={{ color: scoreColor(hs.score) }}>
-                  {fmtScore(hs.score)}
-                </span>
-              </div>
-            ))
-          )}
-        </div>
+              ))
+            )}
+          </div>
+        )}
 
         {/* Sleeve targets */}
         <div className="pt-2.5 border-t border-slate-800/60">
-          <p className="text-xs text-slate-600 mb-1.5 uppercase tracking-wider font-medium">Sleeve targets</p>
+          <p className="text-[10px] text-slate-600 mb-1.5 uppercase tracking-wider font-medium">
+            Sleeve targets
+          </p>
           <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
             {Object.entries(card.sleeve_targets).map(([sleeve, target]) => (
               <div key={sleeve} className="flex justify-between text-xs">
-                <span className="text-slate-500 truncate">{sleeve.replace('_', ' ')}</span>
+                <span className="text-slate-500 truncate">{sleeve.replace(/_/g, ' ')}</span>
                 <span className="font-mono text-slate-300 tabular">{fmtPct(parseFloat(target))}</span>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="text-xs text-slate-600 font-mono">{card.proposal_count} proposals</div>
+        <div className="text-[10px] text-slate-600 font-mono">{card.proposal_count} proposals</div>
       </div>
-    </div>
+    </article>
   )
 }
 
-function DissentMatrix({ rows }: { rows: DissentRow[] }) {
+// ── Dissent matrix ────────────────────────────────────────────────────────────
+
+function isSplitRow(cells: DissentRow['cells']): boolean {
+  const dirs = cells.map(c => c.direction).filter(Boolean)
+  return dirs.includes('buy') && dirs.includes('sell')
+}
+
+function DissentMatrix({ rows, oracleAbstained }: { rows: DissentRow[]; oracleAbstained: Set<string> }) {
   const oracles = ORACLE_IDS
 
   if (rows.length === 0) {
@@ -132,30 +220,40 @@ function DissentMatrix({ rows }: { rows: DissentRow[] }) {
       <table className="w-full text-xs border-collapse">
         <thead>
           <tr>
-            {/* Ticker column header — neutral bar to match oracle columns */}
             <th
-              className="text-left px-4 py-0 text-slate-500 font-medium w-36"
-              style={{ borderRight: '1px solid #1e293b' }}
+              className="text-left px-4 py-3 text-slate-500 font-medium w-40"
+              style={{ borderRight: '1px solid #1e293b', borderBottom: '1px solid #1e293b' }}
             >
-              <div className="h-1 w-full mb-2 bg-slate-800" />
-              <div className="pb-2 pt-0 text-slate-500 text-xs">Ticker</div>
+              Ticker
             </th>
             {oracles.map(oid => {
               const color = ORACLE_COLOR[oid]
-              const shortName = ORACLE_DISPLAY[oid]?.split(' ')[0] ?? oid
+              const abstained = oracleAbstained.has(oid)
+              const Icon = ORACLE_ICON[oid] ?? LayoutGrid
               return (
                 <th
                   key={oid}
                   className="px-2 py-0 text-center w-20"
-                  style={{ borderRight: '1px solid #1e293b' }}
+                  style={{ borderRight: '1px solid #1e293b', borderBottom: '1px solid #1e293b' }}
                 >
                   {/* Colored top bar per column */}
                   <div
-                    className="w-full h-1 mb-2"
-                    style={{ background: color, opacity: 0.85 }}
+                    className="w-full h-[3px] mb-2"
+                    style={{ background: color, opacity: abstained ? 0.3 : 0.85 }}
                   />
-                  <div className="pb-2 font-mono text-xs font-semibold" style={{ color }}>
-                    {shortName}
+                  <div
+                    className="flex flex-col items-center gap-0.5 pb-2"
+                    style={{ color: abstained ? '#475569' : color }}
+                  >
+                    <Icon size={13} />
+                    <span className="font-mono text-[10px] font-semibold">
+                      {ORACLE_SHORT[oid] ?? oid}
+                    </span>
+                    {abstained && (
+                      <span className="text-[9px] text-slate-600 font-mono normal-case">
+                        abstain
+                      </span>
+                    )}
                   </div>
                 </th>
               )
@@ -163,56 +261,72 @@ function DissentMatrix({ rows }: { rows: DissentRow[] }) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, ri) => (
-            <tr
-              key={row.instrument_id}
-              className={`hover:bg-slate-800/40 transition-colors ${
-                ri < rows.length - 1 ? 'border-b border-slate-800/60' : ''
-              }`}
-            >
-              <td
-                className="px-4 py-2.5"
-                style={{ borderRight: '1px solid #1e293b' }}
+          {rows.map((row, ri) => {
+            const split = isSplitRow(row.cells)
+            return (
+              <tr
+                key={row.instrument_id}
+                className={`hover:bg-slate-800/30 transition-colors ${
+                  ri < rows.length - 1 ? 'border-b border-slate-800/60' : ''
+                } ${split ? 'bg-rose-950/20' : ''}`}
               >
-                <span className="font-mono font-semibold text-slate-100">{row.ticker ?? `#${row.instrument_id}`}</span>
-                {row.name && (
-                  <span className="text-slate-500 ml-2 text-xs truncate">{row.name.slice(0, 18)}</span>
-                )}
-              </td>
-              {row.cells.map(cell => {
-                const dir = cell.direction ?? 'hold'
-                const color = DIRECTION_COLOR[dir] ?? '#64748b'
-                const isHold = dir === 'hold'
-                return (
-                  <td
-                    key={cell.oracle_id}
-                    className="px-2 py-2.5 text-center"
-                    style={{ borderRight: '1px solid #1e293b' }}
-                  >
-                    {isHold ? (
-                      <span className="text-slate-700 font-mono">—</span>
-                    ) : (
-                      <span
-                        className="inline-block px-2 py-0.5 rounded text-xs font-mono font-bold tracking-wider"
-                        style={{
-                          color,
-                          background: `${color}1a`,
-                          border: `1px solid ${color}40`,
-                        }}
-                      >
-                        {dir.toUpperCase()}
+                <td
+                  className="px-4 py-2.5"
+                  style={{ borderRight: '1px solid #1e293b' }}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-semibold text-slate-100">
+                      {row.ticker ?? `#${row.instrument_id}`}
+                    </span>
+                    {row.name && (
+                      <span className="text-slate-500 text-[10px] truncate hidden sm:block">
+                        {row.name.slice(0, 16)}
                       </span>
                     )}
-                  </td>
-                )
-              })}
-            </tr>
-          ))}
+                    {split && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded font-mono font-bold text-rose-400 bg-rose-950/50 border border-rose-900/50 flex-shrink-0">
+                        SPLIT
+                      </span>
+                    )}
+                  </div>
+                </td>
+                {row.cells.map(cell => {
+                  const dir = cell.direction ?? 'hold'
+                  const color = DIRECTION_COLOR[dir] ?? '#64748b'
+                  const isHold = dir === 'hold'
+                  return (
+                    <td
+                      key={cell.oracle_id}
+                      className="px-2 py-2.5 text-center"
+                      style={{ borderRight: '1px solid #1e293b' }}
+                    >
+                      {isHold ? (
+                        <span className="text-slate-700 font-mono">—</span>
+                      ) : (
+                        <span
+                          className="inline-block px-2 py-0.5 rounded text-xs font-mono font-bold tracking-wider"
+                          style={{
+                            color,
+                            background: `${color}1a`,
+                            border: `1px solid ${color}40`,
+                          }}
+                        >
+                          {dir.toUpperCase()}
+                        </span>
+                      )}
+                    </td>
+                  )
+                })}
+              </tr>
+            )
+          })}
         </tbody>
       </table>
     </div>
   )
 }
+
+// ── Rivals' objections ────────────────────────────────────────────────────────
 
 function ObjectionsList({ objections }: { objections: RivalObjection[] }) {
   if (objections.length === 0) {
@@ -225,13 +339,19 @@ function ObjectionsList({ objections }: { objections: RivalObjection[] }) {
         const colorA = ORACLE_COLOR[obj.oracle_id] ?? '#64748b'
         const colorB = ORACLE_COLOR[obj.rival_id] ?? '#64748b'
         return (
-          <li key={i} className="flex items-center gap-3 p-3 rounded-lg bg-slate-900 border border-slate-800 text-sm">
-            <span className="font-mono font-semibold text-slate-200">{obj.ticker ?? `#${obj.instrument_id}`}</span>
+          <li key={i} className="flex flex-wrap items-center gap-2.5 p-3 rounded-lg bg-slate-900 border border-slate-800 text-sm">
+            <span className="font-mono font-semibold text-slate-200">
+              {obj.ticker ?? `#${obj.instrument_id}`}
+            </span>
             <span className="text-slate-700">·</span>
             <span style={{ color: colorA }} className="font-medium">{ORACLE_DISPLAY[obj.oracle_id]}</span>
             <span
               className="px-1.5 py-0.5 rounded text-xs font-mono font-bold"
-              style={{ color: DIRECTION_COLOR[obj.oracle_direction], background: `${DIRECTION_COLOR[obj.oracle_direction]}1a`, border: `1px solid ${DIRECTION_COLOR[obj.oracle_direction]}40` }}
+              style={{
+                color: DIRECTION_COLOR[obj.oracle_direction],
+                background: `${DIRECTION_COLOR[obj.oracle_direction]}1a`,
+                border: `1px solid ${DIRECTION_COLOR[obj.oracle_direction]}40`,
+              }}
             >
               {obj.oracle_direction.toUpperCase()}
             </span>
@@ -239,7 +359,11 @@ function ObjectionsList({ objections }: { objections: RivalObjection[] }) {
             <span style={{ color: colorB }} className="font-medium">{ORACLE_DISPLAY[obj.rival_id]}</span>
             <span
               className="px-1.5 py-0.5 rounded text-xs font-mono font-bold"
-              style={{ color: DIRECTION_COLOR[obj.rival_direction], background: `${DIRECTION_COLOR[obj.rival_direction]}1a`, border: `1px solid ${DIRECTION_COLOR[obj.rival_direction]}40` }}
+              style={{
+                color: DIRECTION_COLOR[obj.rival_direction],
+                background: `${DIRECTION_COLOR[obj.rival_direction]}1a`,
+                border: `1px solid ${DIRECTION_COLOR[obj.rival_direction]}40`,
+              }}
             >
               {obj.rival_direction.toUpperCase()}
             </span>
@@ -250,21 +374,18 @@ function ObjectionsList({ objections }: { objections: RivalObjection[] }) {
   )
 }
 
+// ── Empty / loading states ────────────────────────────────────────────────────
+
 function EmptyState({ error }: { error: string | null }) {
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6">
       <div className="flex flex-col items-center gap-4">
-        {/* Logo-inspired oracle column marks */}
         <div className="flex items-end gap-1.5 h-10">
           {Object.entries(ORACLE_COLOR).map(([id, color]) => (
             <div
               key={id}
               className="w-2.5 rounded-t"
-              style={{
-                height: `${28 + Math.random() * 12}px`,
-                background: color,
-                opacity: 0.5,
-              }}
+              style={{ height: `${28 + Math.random() * 12}px`, background: color, opacity: 0.4 }}
             />
           ))}
         </div>
@@ -294,6 +415,8 @@ function EmptyState({ error }: { error: string | null }) {
   )
 }
 
+// ── Chamber page ──────────────────────────────────────────────────────────────
+
 export function Chamber() {
   const { data, error, loading } = useChain(() => api.getLatestChamber())
 
@@ -313,20 +436,41 @@ export function Chamber() {
   if (error) return <EmptyState error={error} />
   if (!data) return null
 
+  const abstainedOracles = new Set(
+    data.oracle_cards.filter(c => c.abstained).map(c => c.oracle_id)
+  )
+  const abstainCount = abstainedOracles.size
+
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-semibold text-white">The Chamber</h1>
-        <p className="text-sm text-slate-500 mt-1 font-mono">
-          run {data.run_id.slice(0, 8)}… &middot; {new Date(data.run_at).toLocaleString()}
-          {data.scenario_id && <span className="ml-2 text-violet-400">scenario: {data.scenario_id}</span>}
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-white">The Chamber</h1>
+          <p className="text-sm text-slate-500 mt-1 font-mono">
+            run {data.run_id.slice(0, 8)}… &middot; {new Date(data.run_at).toLocaleString()}
+            {data.scenario_id && <span className="ml-2 text-violet-400">scenario: {data.scenario_id}</span>}
+          </p>
+        </div>
+        {/* Stat pill */}
+        <div className="flex-shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs font-mono">
+          <span className="text-slate-300 font-semibold">{data.oracle_cards.length}</span>
+          <span className="text-slate-600">oracles</span>
+          {abstainCount > 0 && (
+            <>
+              <span className="text-slate-700">·</span>
+              <span className="text-slate-500 font-semibold">{abstainCount}</span>
+              <span className="text-slate-600">abstain</span>
+            </>
+          )}
+        </div>
       </div>
 
-      {/* Oracle Cards Grid */}
+      {/* Oracle Cards */}
       <section>
-        <h2 className="text-xs font-medium uppercase tracking-wider text-slate-500 mb-4">Oracle Verdicts</h2>
+        <h2 className="text-xs font-medium uppercase tracking-wider text-slate-500 mb-4">
+          Oracle Verdicts
+        </h2>
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
           {data.oracle_cards.map(card => (
             <OracleCardView key={card.oracle_id} card={card} />
@@ -339,7 +483,7 @@ export function Chamber() {
         <h2 className="text-xs font-medium uppercase tracking-wider text-slate-500 mb-4">
           Dissent Matrix
         </h2>
-        <DissentMatrix rows={data.dissent_matrix} />
+        <DissentMatrix rows={data.dissent_matrix} oracleAbstained={abstainedOracles} />
       </section>
 
       {/* Rivals' Objections */}
