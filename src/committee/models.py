@@ -34,6 +34,21 @@ class ImportBatch(Base):
     transactions: Mapped[list[Transaction]] = relationship(back_populates="batch")
 
 
+class Account(Base):
+    """Reference table for brokerage accounts."""
+
+    __tablename__ = "accounts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    account_key: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    broker: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tax_type: Mapped[str | None] = mapped_column(Text, nullable=True)  # taxable|trad|roth|401k
+    label: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
+
+
 class Instrument(Base):
     """Canonical instrument record. Populated by the resolver (M1b)."""
 
@@ -47,6 +62,7 @@ class Instrument(Base):
     asset_class: Mapped[str | None] = mapped_column(Text, nullable=True)
     sleeve: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_cash_equivalent: Mapped[bool] = mapped_column(Integer, nullable=False, default=False)
+    needs_unwind: Mapped[bool] = mapped_column(Integer, nullable=False, default=False)
     aliases: Mapped[Any] = mapped_column(JSON, nullable=False, default=list)
     bundle_tags: Mapped[Any] = mapped_column(JSON, nullable=False, default=list)
     created_at: Mapped[datetime] = mapped_column(
@@ -112,6 +128,7 @@ class MappingDecision(Base):
     resolved_to: Mapped[str | None] = mapped_column(Text, nullable=True)
     method: Mapped[str] = mapped_column(Text, nullable=False)
     confidence: Mapped[float | None] = mapped_column(DecimalText, nullable=True)  # type: ignore[assignment]
+    accepted_by: Mapped[str | None] = mapped_column(Text, nullable=True)  # "auto" | "human"
     decided_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
     )

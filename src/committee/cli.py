@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import contextlib
 from pathlib import Path
 
 import typer
 from rich.console import Console
+from rich.table import Table
 
 app = typer.Typer(name="committee", add_completion=False)
 console = Console()
@@ -21,6 +23,7 @@ def import_file(
     profiles: Path = _PROFILES_OPT,
     non_interactive: bool = typer.Option(False, "--non-interactive", "-n", help="Skip prompts"),
     file_type: str | None = typer.Option(None, "--type", help="Force 'positions' or 'transactions'"),
+    no_resolve: bool = typer.Option(False, "--no-resolve", help="Skip auto-resolution after import"),
 ) -> None:
     """Import a positions or transactions CSV file."""
     from committee.db import get_session, init_db
@@ -45,37 +48,30 @@ def import_file(
         console.print(f"[red]Import error: {e}[/red]")
         raise typer.Exit(1) from None
 
-    # Force file type if user specified
     if file_type:
         if file_type not in ("positions", "transactions"):
             console.print("[red]--type must be 'positions' or 'transactions'[/red]")
             raise typer.Exit(1)
         result = result.model_copy(update={"file_type": file_type})
 
-    # Get data rows for review display
     raw_rows = read_csv_rows(content)
     headers, data_rows = preclean(raw_rows)
 
-    # Template interaction
     if result.template_name is not None:
-        # Template auto-loaded — show confirmation screen
         proceed = confirm_existing_template(result, data_rows, headers, non_interactive)
         if not proceed:
             console.print("[yellow]Import cancelled.[/yellow]")
             raise typer.Exit(0)
     else:
-        # New broker — interactive review and save
         template = review_and_save(result, data_rows, headers, profiles, non_interactive)
         result = result.model_copy(update={
             "template_name": template.name,
             "column_map": template.column_map,
         })
 
-    # Show queued types
     if result.queued_types:
         console.print(f"\n[yellow]Unknown transaction types queued for review: {result.queued_types}[/yellow]")
 
-    # Persist
     init_db(db)
     gen = get_session()
     session = next(gen)
@@ -86,13 +82,268 @@ def import_file(
             f"\n[green]Imported {result.row_count} {result.file_type} rows "
             f"(batch #{batch.id})[/green]"
         )
+
+        if not no_resolve and result.file_type == "positions":
+            _run_auto_resolve(session, batch.id)
+            session.commit()
+
     except ValueError as e:
         console.print(f"[yellow]{e}[/yellow]")
     except Exception:
         session.rollback()
         raise
     finally:
-        import contextlib
+        with contextlib.suppress(StopIteration):
+            next(gen)
+
+
+def _run_auto_resolve(session: object, batch_id: int) -> None:
+    """Run the resolver cascade on all unresolved raw_instrument values in a batch."""
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+
+    from committee.models import PositionSnapshot
+    from committee.resolver.cascade import resolve_instrument
+    from committee.resolver.openfigi import live_figi_lookup
+
+    if not isinstance(session, Session):
+        return
+
+    snapshots = session.execute(
+        select(PositionSnapshot).where(PositionSnapshot.batch_id == batch_id)
+    ).scalars().all()
+
+    seen: set[str] = set()
+    resolved = queued = 0
+    for snap in snapshots:
+        raw = snap.raw_instrument
+        if not raw or raw in seen:
+            continue
+        seen.add(raw)
+        res = resolve_instrument(
+            raw_ticker=raw,
+            raw_name=None,
+            session=session,
+            batch_id=batch_id,
+            figi_lookup=live_figi_lookup,
+        )
+        if res.queued:
+            queued += 1
+        else:
+            resolved += 1
+
+    if resolved or queued:
+        console.print(
+            f"  Resolver: [green]{resolved} resolved[/green]"
+            + (f", [yellow]{queued} queued[/yellow]" if queued else "")
+        )
+
+
+@app.command()
+def resolve(
+    db: Path = _DB_PATH_OPT,
+) -> None:
+    """Interactively resolve queued instruments."""
+    from datetime import datetime
+
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+
+    from committee.db import get_session, init_db
+    from committee.models import Instrument, UnresolvedQueue
+    from committee.resolver.aliases import get_or_create_cash
+    from committee.resolver.cascade import _add_alias, _write_decision
+    from committee.resolver.classify import (
+        infer_asset_class,
+        needs_unwind_flag,
+    )
+
+    init_db(db)
+    gen = get_session()
+    session = next(gen)
+    if not isinstance(session, Session):
+        return
+
+    try:
+        pending = session.execute(
+            select(UnresolvedQueue).where(
+                UnresolvedQueue.queue_type == "instrument",
+                UnresolvedQueue.resolved_at.is_(None),
+            ).order_by(UnresolvedQueue.created_at)
+        ).scalars().all()
+
+        if not pending:
+            console.print("[green]No unresolved instruments.[/green]")
+            raise typer.Exit(0)
+
+        console.print(f"\n[bold]Unresolved instruments ({len(pending)} pending)[/bold]\n")
+
+        for item in pending:
+            ctx = item.context_json or {}
+            candidates_raw: list[tuple[int, int]] = ctx.get("candidates", [])
+
+            console.rule(f"[bold]{item.raw_value}[/bold]")
+
+            # Show candidates if any
+            candidate_insts: list[Instrument] = []
+            if candidates_raw:
+                console.print("  Candidates (fuzzy matches):")
+                for inst_id, score in candidates_raw[:3]:
+                    inst = session.get(Instrument, inst_id)
+                    if inst:
+                        candidate_insts.append(inst)
+                        console.print(f"    [{len(candidate_insts)}] {inst.ticker or '?'} — {inst.name} (score {score})")
+
+            console.print(
+                "\n  Options: "
+                + ("[a]ccept candidate  " if candidate_insts else "")
+                + "[s]earch  [c]reate  [m]ark-cash  [k]eep  [q]uit"
+            )
+            choice = typer.prompt("  Enter choice", default="k").strip().lower()
+
+            if choice == "q":
+                break
+
+            if choice == "k":
+                continue
+
+            resolved_inst: Instrument | None = None
+
+            if choice == "a" and candidate_insts:
+                if len(candidate_insts) == 1:
+                    resolved_inst = candidate_insts[0]
+                else:
+                    idx = typer.prompt(
+                        f"  Choose candidate (1–{len(candidate_insts)})", default="1"
+                    )
+                    try:
+                        resolved_inst = candidate_insts[int(idx) - 1]
+                    except (ValueError, IndexError):
+                        console.print("[red]Invalid choice, keeping in queue.[/red]")
+                        continue
+
+            elif choice == "s":
+                ticker_in = typer.prompt("  Ticker or FIGI").strip().upper()
+                found = session.execute(
+                    select(Instrument).where(Instrument.ticker == ticker_in)
+                ).scalar_one_or_none()
+                if found is None:
+                    console.print(f"[yellow]No instrument found for '{ticker_in}'.[/yellow]")
+                    continue
+                resolved_inst = found
+
+            elif choice == "c":
+                ticker_in = typer.prompt("  Ticker (leave blank for name-only)").strip() or None
+                name_in = typer.prompt("  Name").strip() or None
+                itype = typer.prompt("  Type (stock/etf/mutual_fund/cash/unclassified)", default="unclassified").strip()
+                itype = itype if itype in ("stock", "etf", "mutual_fund", "cash") else "unclassified"
+                asset_class = infer_asset_class(itype, name_in)
+                resolved_inst = Instrument(
+                    ticker=ticker_in,
+                    name=name_in,
+                    instrument_type=itype,
+                    asset_class=asset_class,
+                    sleeve="unclassified",
+                    is_cash_equivalent=(itype == "cash"),
+                    needs_unwind=needs_unwind_flag(itype),
+                    aliases=[],
+                    bundle_tags=[],
+                )
+                session.add(resolved_inst)
+                session.flush()
+
+            elif choice == "m":
+                resolved_inst = get_or_create_cash(session)
+
+            else:
+                console.print("[yellow]Unknown choice, keeping in queue.[/yellow]")
+                continue
+
+            if resolved_inst is not None:
+                _add_alias(resolved_inst, item.raw_value)
+                _write_decision(
+                    session,
+                    batch_id=ctx.get("batch_id"),
+                    raw_value=item.raw_value,
+                    resolved_to=resolved_inst.ticker,
+                    method="human",
+                    confidence=__import__("decimal").Decimal("1"),
+                    accepted_by="human",
+                )
+                item.resolved_at = datetime.now()
+                item.resolved_to = resolved_inst.ticker
+                session.commit()
+                console.print(f"  [green]Resolved → {resolved_inst.ticker or resolved_inst.name}[/green]")
+
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        with contextlib.suppress(StopIteration):
+            next(gen)
+
+
+@app.command()
+def holdings(
+    db: Path = _DB_PATH_OPT,
+    account: str | None = typer.Option(None, "--account", "-a", help="Filter by account ID"),
+    household: bool = typer.Option(False, "--household", "-H", help="Aggregate across all accounts"),
+) -> None:
+    """Derive and display current holdings from latest position snapshots."""
+    from committee.db import get_session, init_db
+    from committee.holdings import household_view as agg_household
+    from committee.holdings import rebuild_holdings
+
+    init_db(db)
+    gen = get_session()
+    session = next(gen)
+    try:
+        rows = rebuild_holdings(session)
+        session.commit()
+
+        if account:
+            rows = [r for r in rows if r.account_id == account]
+        if household:
+            rows = agg_household(rows)
+
+        if not rows:
+            console.print("[yellow]No holdings found. Run 'committee import' first.[/yellow]")
+            raise typer.Exit(0)
+
+        tbl = Table(title="Holdings" + (" — Household" if household else ""), show_lines=False)
+        tbl.add_column("Ticker", style="bold")
+        tbl.add_column("Name")
+        tbl.add_column("Type")
+        tbl.add_column("Account")
+        tbl.add_column("Qty", justify="right")
+        tbl.add_column("Mkt Value", justify="right")
+        tbl.add_column("As Of")
+
+        for r in sorted(rows, key=lambda x: (x.ticker or x.raw_instrument)):
+            ticker_str = r.ticker or f"[dim]{r.raw_instrument}[/dim]"
+            if not r.is_resolved:
+                ticker_str = f"[red]{r.raw_instrument}[/red]"
+            tbl.add_row(
+                ticker_str,
+                r.name or "—",
+                r.instrument_type or "—",
+                r.account_id or "household",
+                f"{r.qty:,.4f}" if r.qty is not None else "—",
+                f"${r.market_value:,.2f}" if r.market_value is not None else "—",
+                r.as_of.isoformat() if r.as_of else "—",
+            )
+
+        console.print(tbl)
+        unresolved = sum(1 for r in rows if not r.is_resolved)
+        if unresolved:
+            console.print(
+                f"[yellow]{unresolved} unresolved instrument(s). "
+                "Run 'committee resolve' to link them.[/yellow]"
+            )
+    except Exception:
+        session.rollback()
+        raise
+    finally:
         with contextlib.suppress(StopIteration):
             next(gen)
 
