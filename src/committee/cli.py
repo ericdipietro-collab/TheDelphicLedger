@@ -11,7 +11,9 @@ from rich.table import Table
 
 app = typer.Typer(name="committee", add_completion=False)
 universe_app = typer.Typer(name="universe", help="Manage the instrument universe (bundles).")
+recon_app = typer.Typer(name="recon", help="Quantity reconciliation (run, list, show, resolve).")
 app.add_typer(universe_app, name="universe")
+app.add_typer(recon_app, name="recon")
 console = Console()
 
 _DB_PATH_OPT = typer.Option(Path("data/ledger.db"), "--db", help="SQLite database path")
@@ -550,6 +552,204 @@ def universe_status(
             )
 
         console.print(tbl)
+    finally:
+        with contextlib.suppress(StopIteration):
+            next(gen)
+
+
+# ── Recon commands ─────────────────────────────────────────────────────────────
+
+@recon_app.command("run")
+def recon_run(
+    db: Path = _DB_PATH_OPT,
+    materiality_shares: float = typer.Option(0.5, "--materiality-shares", help="Shares tolerance"),
+    materiality_pct: float = typer.Option(0.001, "--materiality-pct", help="Pct tolerance (0.001 = 0.1%)"),
+) -> None:
+    """Run quantity reconciliation across all instruments."""
+    from decimal import Decimal
+
+    from committee.db import get_session, init_db
+    from committee.recon.engine import ReconConfig, run_recon
+
+    init_db(db)
+    gen = get_session()
+    session = next(gen)
+    try:
+        config = ReconConfig(
+            materiality_shares=Decimal(str(materiality_shares)),
+            materiality_pct=Decimal(str(materiality_pct)),
+        )
+        summary = run_recon(session, config)
+        session.commit()
+        console.print(
+            f"[bold]Recon complete.[/bold] "
+            f"[red]{summary.open_breaks} open[/red]  "
+            f"[yellow]{summary.coverage_gaps} gaps[/yellow]  "
+            f"[dim]{summary.auto_closed} auto-closed[/dim]  "
+            f"[green]{summary.checkpoints_clean} clean[/green]"
+        )
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        with contextlib.suppress(StopIteration):
+            next(gen)
+
+
+@recon_app.command("list")
+def recon_list(
+    db: Path = _DB_PATH_OPT,
+    status: str = typer.Option("open", "--status", "-s", help="Filter by status (open/resolved/auto_closed/all)"),
+) -> None:
+    """List reconciliation breaks."""
+    from sqlalchemy import select
+
+    from committee.db import get_session, init_db
+    from committee.models import Instrument, ReconBreak
+
+    init_db(db)
+    gen = get_session()
+    session = next(gen)
+    try:
+        q = select(ReconBreak).order_by(ReconBreak.as_of.desc(), ReconBreak.id)
+        if status != "all":
+            q = q.where(ReconBreak.status == status)
+        breaks = session.execute(q).scalars().all()
+
+        if not breaks:
+            console.print(f"[green]No breaks with status='{status}'.[/green]")
+            raise typer.Exit(0)
+
+        tbl = Table(title=f"Recon breaks (status={status})", show_lines=False)
+        tbl.add_column("ID", justify="right")
+        tbl.add_column("Ticker")
+        tbl.add_column("Account")
+        tbl.add_column("As Of")
+        tbl.add_column("Expected", justify="right")
+        tbl.add_column("Actual", justify="right")
+        tbl.add_column("Delta", justify="right")
+        tbl.add_column("Cause")
+        tbl.add_column("Gap?")
+        tbl.add_column("Status")
+
+        for brk in breaks:
+            inst = session.get(Instrument, brk.instrument_id)
+            ticker = inst.ticker if inst else f"inst#{brk.instrument_id}"
+            delta_str = f"{brk.delta:+.4f}" if brk.delta is not None else "—"
+            delta_style = "red" if brk.delta and brk.delta != 0 else "green"
+            tbl.add_row(
+                str(brk.id),
+                ticker or "—",
+                brk.account_id,
+                brk.as_of.isoformat(),
+                f"{brk.expected_qty:.4f}" if brk.expected_qty is not None else "—",
+                f"{brk.actual_qty:.4f}" if brk.actual_qty is not None else "—",
+                f"[{delta_style}]{delta_str}[/{delta_style}]",
+                brk.suggested_cause or "—",
+                "[yellow]yes[/yellow]" if brk.coverage_gap else "no",
+                brk.status,
+            )
+
+        console.print(tbl)
+    finally:
+        with contextlib.suppress(StopIteration):
+            next(gen)
+
+
+@recon_app.command("show")
+def recon_show(
+    break_id: int = typer.Argument(..., help="Break ID"),
+    db: Path = _DB_PATH_OPT,
+) -> None:
+    """Show details for a single reconciliation break."""
+    from committee.db import get_session, init_db
+    from committee.models import Instrument, ReconBreak
+    from committee.recon.projector import project_qty
+
+    init_db(db)
+    gen = get_session()
+    session = next(gen)
+    try:
+        brk = session.get(ReconBreak, break_id)
+        if brk is None:
+            console.print(f"[red]Break {break_id} not found.[/red]")
+            raise typer.Exit(1)
+
+        inst = session.get(Instrument, brk.instrument_id)
+        console.print(f"\n[bold]Break #{brk.id}[/bold]")
+        console.print(f"  Instrument : {inst.ticker if inst else '?'} (id={brk.instrument_id})")
+        console.print(f"  Account    : {brk.account_id}")
+        console.print(f"  As of      : {brk.as_of}")
+        console.print(f"  Expected   : {brk.expected_qty}")
+        console.print(f"  Actual     : {brk.actual_qty}")
+        console.print(f"  Delta      : [red]{brk.delta:+.4f}[/red]" if brk.delta else "  Delta      : 0")
+        console.print(f"  Cause      : {brk.suggested_cause or '—'}")
+        console.print(f"  Coverage gap: {'[yellow]yes[/yellow]' if brk.coverage_gap else 'no'}")
+        console.print(f"  Status     : {brk.status}")
+        if brk.resolution_note:
+            console.print(f"  Note       : {brk.resolution_note}")
+        if brk.resolved_at:
+            console.print(f"  Resolved at: {brk.resolved_at}")
+
+        # Re-run projector to show effects
+        if inst and brk.expected_qty is not None:
+            from sqlalchemy import select as sa_select
+
+            from committee.models import PositionSnapshot
+            prev_snap = session.execute(
+                sa_select(PositionSnapshot)
+                .where(
+                    PositionSnapshot.instrument_id == brk.instrument_id,
+                    PositionSnapshot.account_id == brk.account_id,
+                    PositionSnapshot.as_of < brk.as_of,
+                    PositionSnapshot.qty.isnot(None),
+                )
+                .order_by(PositionSnapshot.as_of.desc())
+                .limit(1)
+            ).scalar_one_or_none()
+            if prev_snap and prev_snap.as_of:
+                result = project_qty(
+                    session,
+                    brk.instrument_id,
+                    brk.account_id,
+                    prev_snap.as_of,
+                    prev_snap.qty,
+                    brk.as_of,
+                )
+                if result.effects:
+                    console.print("\n  Effects applied:")
+                    for eff in result.effects:
+                        console.print(f"    {eff.effect_date}  {eff.description}  (Δ {eff.delta:+.4f})")
+                else:
+                    console.print("\n  No qty-affecting transactions in window.")
+    finally:
+        with contextlib.suppress(StopIteration):
+            next(gen)
+
+
+@recon_app.command("resolve")
+def recon_resolve(
+    break_id: int = typer.Argument(..., help="Break ID to resolve"),
+    note: str = typer.Option(..., "--note", "-n", help="Resolution note"),
+    db: Path = _DB_PATH_OPT,
+) -> None:
+    """Resolve a reconciliation break with a typed note (audit write)."""
+    from committee.db import get_session, init_db
+    from committee.recon.engine import resolve_break
+
+    init_db(db)
+    gen = get_session()
+    session = next(gen)
+    try:
+        resolve_break(session, break_id, note)
+        session.commit()
+        console.print(f"[green]Break #{break_id} resolved.[/green]")
+    except ValueError as e:
+        console.print(f"[red]{e}[/red]")
+        raise typer.Exit(1) from None
+    except Exception:
+        session.rollback()
+        raise
     finally:
         with contextlib.suppress(StopIteration):
             next(gen)

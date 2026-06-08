@@ -195,6 +195,24 @@ class ReconBreak(Base):
     status: Mapped[str] = mapped_column(Text, nullable=False)  # "open" | "resolved" | "auto_closed"
     resolution_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     coverage_gap: Mapped[bool] = mapped_column(Integer, nullable=False, default=False)
+    # "missed_reinvest" | "unrecorded_transfer" | "split" | "import_gap" | "immaterial"
+    suggested_cause: Mapped[str | None] = mapped_column(Text, nullable=True)
+    opened_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class InstrumentEvent(Base):
+    """Corporate action that adjusts share quantity (split, reverse split)."""
+
+    __tablename__ = "instrument_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    instrument_id: Mapped[int] = mapped_column(ForeignKey("instruments.id"), nullable=False)
+    event_date: Mapped[date] = mapped_column(Date, nullable=False)
+    # "split" | "reverse_split"
+    event_type: Mapped[str] = mapped_column(Text, nullable=False)
+    ratio: Mapped[Decimal] = mapped_column(DecimalText, nullable=False)  # new_qty / old_qty
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class MarketObservation(Base):
