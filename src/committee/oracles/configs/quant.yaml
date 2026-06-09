@@ -15,4 +15,4 @@ metric_weights:
   beta_vs_spy: 0.15
 persona_constraints:
   min_score_to_buy: -0.1
-abstain_floor: 0.50
+abstain_floor: 0.25

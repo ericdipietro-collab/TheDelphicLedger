@@ -9,7 +9,7 @@ from rapidfuzz import fuzz
 SYNONYMS: dict[str, list[str]] = {
     # positions
     "symbol": ["symbol", "ticker", "ticker symbol", "security", "cusip"],
-    "name": ["name", "description", "security name", "fund name", "investment name", "security description"],
+    "name": ["name", "description", "security name", "fund name", "investment name", "security description", "investment"],
     "qty": ["quantity", "qty", "shares", "units", "# shares", "shares/units"],
     "price": ["price", "last price", "market price", "close price", "share price"],
     "market_value": ["market value", "value", "current value", "total value", "market val"],
@@ -18,7 +18,9 @@ SYNONYMS: dict[str, list[str]] = {
     # transactions
     "trade_date": ["trade date", "date", "transaction date", "settlement date", "trade"],
     "settle_date": ["settlement date", "settle date", "settled"],
-    "raw_type": ["action", "type", "transaction type", "activity", "transaction", "description"],
+    "raw_type": ["action", "type", "transaction type", "activity", "transaction", "trans type", "activity type"],
+    "distribution_yield": ["div yld", "dividend yield", "yield", "distribution yield", "div yield", "sec yld"],
+    "asset_class": ["asset type", "asset class", "security type", "type of investment", "product type"],
     "amount": ["amount", "net amount", "total", "proceeds", "value"],
     "fees": ["fees", "commission", "fee", "charges"],
 }

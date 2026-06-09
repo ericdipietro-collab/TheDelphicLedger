@@ -24,6 +24,19 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return res.json() as Promise<T>
 }
 
+async function put<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({ detail: res.statusText }))
+    throw new Error(detail.detail ?? res.statusText)
+  }
+  return res.json() as Promise<T>
+}
+
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 export interface RunSummary {
@@ -210,6 +223,14 @@ export interface ConfigResponse {
   available_profiles: string[]
 }
 
+export interface BundleInfo {
+  id: string
+  display_name: string
+  enabled: boolean
+  instrument_count: number
+  last_refreshed_at: string | null
+}
+
 export interface RecomputeRequest {
   run_id?: string
   constraint: string
@@ -232,6 +253,9 @@ export const api = {
   getScenario: (pack_id: string) => get<ScenarioResult>(`/scenarios/${pack_id}`),
   getRecon: () => get<ReconResponse>('/recon'),
   getConfig: () => get<ConfigResponse>('/config'),
+  getBundles: () => get<BundleInfo[]>('/config/bundles'),
+  setBundleEnabled: (id: string, enabled: boolean) =>
+    put<BundleInfo>(`/config/bundles/${id}`, { enabled }),
   convene: (constraint = 'unconstrained') => post<ChamberResponse>('/actions/convene', { constraint }),
   runScenario: (pack_id: string, constraint = 'unconstrained') =>
     post<ScenarioResult>(`/actions/scenario/${pack_id}/run`, { constraint }),

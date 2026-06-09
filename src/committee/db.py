@@ -28,6 +28,20 @@ def init_db(db_path: Path = _DEFAULT_DB) -> Engine:
         cursor.close()
 
     Base.metadata.create_all(engine)
+
+    # Ensure performance indexes exist on the live DB (idempotent — IF NOT EXISTS).
+    # create_all won't add indexes to pre-existing tables, so we apply them explicitly.
+    with engine.connect() as conn:
+        conn.execute(__import__("sqlalchemy").text(
+            "CREATE INDEX IF NOT EXISTS ix_mo_instrument_unit_date"
+            " ON market_observations (instrument_id, unit, observed_date)"
+        ))
+        conn.execute(__import__("sqlalchemy").text(
+            "CREATE INDEX IF NOT EXISTS ix_mo_series_date"
+            " ON market_observations (series_id, observed_date)"
+        ))
+        conn.commit()
+
     _engine = engine
     _Session = sessionmaker(bind=engine)
     return engine

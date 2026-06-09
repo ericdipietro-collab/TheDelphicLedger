@@ -33,10 +33,18 @@ class FredObs:
 
 
 @with_backoff()
-def fetch_fred_series(series_id: str) -> list[FredObs]:
+def fetch_fred_series(series_id: str, lookback_years: int = 3) -> list[FredObs]:
+    """Fetch recent observations only (default: 3 years back).
+
+    The fredgraph.csv endpoint supports `cosd` / `coed` date filters,
+    which keeps payload size from growing unboundedly on repeat calls.
+    """
+    from datetime import date, timedelta
+
+    start = (date.today() - timedelta(days=lookback_years * 365)).isoformat()
     resp = requests.get(
         _FRED_CSV_URL,
-        params={"id": series_id},
+        params={"id": series_id, "cosd": start},
         timeout=30,
     )
     resp.raise_for_status()
@@ -89,9 +97,15 @@ def compute_cpi_yoy(obs: list[FredObs]) -> list[FredObs]:
 
 
 def fetch_all_fred() -> dict[str, list[FredObs]]:
-    """Fetch all configured FRED series (and derived CPIAUCSL_YOY)."""
+    """Fetch all configured FRED series in parallel, then derive CPIAUCSL_YOY."""
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
     results: dict[str, list[FredObs]] = {}
-    for series_id in FRED_SERIES:
-        results[series_id] = fetch_fred_series(series_id)
+    with ThreadPoolExecutor(max_workers=len(FRED_SERIES)) as pool:
+        futures = {pool.submit(fetch_fred_series, sid): sid for sid in FRED_SERIES}
+        for fut in as_completed(futures):
+            sid = futures[fut]
+            results[sid] = fut.result()  # raises on error, propagates to caller
+
     results["CPIAUCSL_YOY"] = compute_cpi_yoy(results.get("CPIAUCSL", []))
     return results

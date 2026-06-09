@@ -27,7 +27,7 @@ from committee.core.types import (
     PersonaConstraints,
     ScenarioContext,
 )
-from committee.models import Holding, Instrument, MarketObservation
+from committee.models import Holding, Instrument, MarketObservation, UniverseEntry
 from committee.oracles.base import ORACLE_IDS, OracleConfig, load_oracle_config
 from committee.oracles.metrics import compute_universe_metrics
 from committee.oracles.scoring import (
@@ -66,14 +66,20 @@ def _build_persona_constraints(raw: dict[str, object]) -> PersonaConstraints:
 
 
 def _fetch_active_instruments(session: Session) -> dict[int, Instrument]:
-    """All instruments that have at least one holding record."""
-    rows = session.execute(
+    """All instruments that are held OR are active buy candidates (in UniverseEntry)."""
+    held = session.execute(
         select(Instrument)
         .join(Holding, Holding.instrument_id == Instrument.id)
         .distinct()
-        .order_by(Instrument.id)
     ).scalars().all()
-    return {inst.id: inst for inst in rows}
+    universe = session.execute(
+        select(Instrument)
+        .join(UniverseEntry, UniverseEntry.instrument_id == Instrument.id)
+        .distinct()
+    ).scalars().all()
+    combined = {inst.id: inst for inst in held}
+    combined.update({inst.id: inst for inst in universe})
+    return combined
 
 
 def _run_macro_tactician(
@@ -215,14 +221,21 @@ def run_oracle(
     config: OracleConfig,
     session: Session,
     scenario: ScenarioContext | None = None,
+    active_instruments: dict[int, Instrument] | None = None,
+    all_metrics: dict[int, dict[str, float | None]] | None = None,
 ) -> OracleOutput:
-    """Run one oracle and return its output. No trades emitted (Invariant A)."""
+    """Run one oracle and return its output. No trades emitted (Invariant A).
+
+    active_instruments and all_metrics may be pre-computed by run_all_oracles to
+    avoid repeating the same bulk DB queries six times per convene.
+    """
     if config.id == "macro_tactician":
         return _run_macro_tactician(
             config, session, scenario=scenario, persist_regime=(scenario is None)
         )
 
-    active_instruments = _fetch_active_instruments(session)
+    if active_instruments is None:
+        active_instruments = _fetch_active_instruments(session)
     if not active_instruments:
         return OracleOutput(
             oracle_id=config.id,
@@ -231,7 +244,7 @@ def run_oracle(
             sleeve_targets=config.sleeve_targets,
             persona_constraints=_build_persona_constraints(config.persona_constraints),
             abstained=True,
-            abstain_reason="no_holdings",
+            abstain_reason="no_holdings_or_universe",
         )
 
     # Apply universe filter
@@ -258,8 +271,8 @@ def run_oracle(
             abstain_reason=f"no_instruments_match_filter:{config.universe_filter}",
         )
 
-    # Compute raw metrics for all instruments in the DB (universe for percentiles)
-    all_metrics = compute_universe_metrics(session, scenario=scenario)
+    if all_metrics is None:
+        all_metrics = compute_universe_metrics(session, scenario=scenario)
 
     # Build universe raw values per metric for percentile computation
     universe_raw: dict[str, list[float]] = {}
@@ -270,7 +283,7 @@ def run_oracle(
             if v is not None:
                 universe_raw.setdefault(metric_id, []).append(v)
 
-    # Score each holding
+    # Score each instrument
     per_holding_scores: dict[int, HoldingScore] = {}
     for iid, inst in scored_instruments.items():
         raw = all_metrics.get(iid, {})
@@ -302,11 +315,22 @@ def run_all_oracles(
     session: Session,
     scenario: ScenarioContext | None = None,
 ) -> list[OracleOutput]:
-    """Run all six oracles and return their outputs."""
+    """Run all six oracles and return their outputs.
+
+    Bulk-fetches active instruments and metrics once, then passes to each oracle
+    to avoid repeating the same queries six times.
+    """
+    active_instruments = _fetch_active_instruments(session)
+    all_metrics = compute_universe_metrics(session, scenario=scenario)
+
     outputs = []
     for oracle_id in ORACLE_IDS:
         config = load_oracle_config(oracle_id)
-        outputs.append(run_oracle(config, session, scenario=scenario))
+        outputs.append(run_oracle(
+            config, session, scenario=scenario,
+            active_instruments=active_instruments,
+            all_metrics=all_metrics,
+        ))
     return outputs
 
 

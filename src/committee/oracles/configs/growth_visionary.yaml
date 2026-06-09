@@ -15,4 +15,4 @@ metric_weights:
 persona_constraints:
   max_positions: 20
   min_score_to_buy: 0.1
-abstain_floor: 0.35
+abstain_floor: 0.30

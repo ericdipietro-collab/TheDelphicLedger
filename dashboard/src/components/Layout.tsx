@@ -6,6 +6,8 @@ import {
   FlaskConical,
   Scale,
   Settings2,
+  Upload,
+  GitMerge,
 } from 'lucide-react'
 
 const NAV = [
@@ -14,6 +16,8 @@ const NAV = [
   { to: '/trades',    label: 'Trades',       Icon: ArrowLeftRight  },
   { to: '/scenarios', label: 'Scenarios',    Icon: FlaskConical    },
   { to: '/recon',     label: 'Recon',        Icon: Scale           },
+  { to: '/import',    label: 'Import',       Icon: Upload          },
+  { to: '/resolve',   label: 'Resolve',      Icon: GitMerge        },
   { to: '/config',    label: 'Config',       Icon: Settings2       },
 ]
 

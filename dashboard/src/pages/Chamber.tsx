@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import {
   ShieldCheck, Rocket, Banknote, Globe, Cpu, LayoutGrid,
-  AlertTriangle, Columns3, RefreshCw,
+  AlertTriangle, Columns3, RefreshCw, TrendingUp, BarChart2, FileText, Tag, Boxes, Info,
 } from 'lucide-react'
-import { api, OracleCard, ChamberResponse, DissentRow, RivalObjection } from '../api'
+import { api, BundleInfo, OracleCard, ChamberResponse, DissentRow, RivalObjection } from '../api'
 import { ORACLE_IDS, ORACLE_COLOR, ORACLE_DISPLAY, fmtScore, fmtPct, scoreColor, DIRECTION_COLOR } from '../constants'
 
 // ── Per-oracle identity metadata ──────────────────────────────────────────────
@@ -18,13 +18,43 @@ const ORACLE_ICON = {
 } as Record<string, React.ElementType>
 
 const ORACLE_PHILOSOPHY = {
-  value_purist:       { tagline: 'Margin of safety',    metrics: 'P/E · P/B · FCF · D/E' },
-  growth_visionary:   { tagline: 'Category winners',    metrics: 'Rev YoY · Margin · Mom.' },
-  yield_harvester:    { tagline: 'The check clears',    metrics: 'Distribution · Payout' },
-  macro_tactician:    { tagline: 'Regime-aware ballast', metrics: 'T10Y3M · CPI · DXY · VIX' },
-  quant:              { tagline: 'Humans are biased',   metrics: 'RSI · MA · 12-1 · β' },
-  passive_pragmatist: { tagline: 'Cost & concentration', metrics: 'Expense · HHI · Turnover' },
-} as Record<string, { tagline: string; metrics: string }>
+  value_purist: {
+    tagline: 'Margin of safety',
+    metrics: 'P/E · P/B · FCF · D/E',
+    description: 'Seeks companies trading meaningfully below their intrinsic value. Inspired by Graham and Buffett: only buys when price leaves a cushion against estimation error. Scores heavily on P/E, P/B, free cash flow yield, and debt discipline. Will not chase momentum or pay a growth premium — patience is the edge.',
+    goal: 'Buy undervalued, avoid overpaying',
+  },
+  growth_visionary: {
+    tagline: 'Category winners',
+    metrics: 'Rev YoY · Margin · Mom.',
+    description: 'Identifies durable compounders with accelerating revenue, expanding margins, and strong price momentum. Willing to pay up for companies that can sustain above-market growth for years. Scores on revenue YoY, gross margin trajectory, and 6-month momentum. Avoids value traps and slow-growth industries.',
+    goal: 'Own the winners before consensus catches up',
+  },
+  yield_harvester: {
+    tagline: 'The check clears',
+    metrics: 'Distribution · Payout',
+    description: 'Income first. Prioritises assets where dividends and distributions are well-covered and growing. Scores on trailing distribution yield, payout sustainability, and multi-year dividend growth streaks. Abstains when income data is absent. Skews toward funds, REITs, and dividend-growth equities.',
+    goal: 'Generate reliable, growing cash income',
+  },
+  macro_tactician: {
+    tagline: 'Regime-aware ballast',
+    metrics: 'T10Y3M · CPI · DXY · VIX',
+    description: 'Reads the macro environment — yield curve shape, inflation regime, dollar strength, and volatility — to determine portfolio tilt. Does not score individual securities. Instead sets sleeve targets (equity vs. fixed income vs. alternatives) based on whether the regime is neutral, defensive, or aggressive. Uses hysteresis to avoid flip-flopping on noise.',
+    goal: 'Right-size risk for the current macro regime',
+  },
+  quant: {
+    tagline: 'Humans are biased',
+    metrics: 'RSI · MA · 12-1 · β',
+    description: 'Systematic and signal-driven — ignores narrative entirely. Scores on technical price signals: RSI(14), 50/200-day MA cross, 12-month-minus-1-month momentum factor, and beta to SPY. Assumes market participants exhibit predictable behavioral biases that create exploitable patterns in price data.',
+    goal: 'Capture systematic price-based factors',
+  },
+  passive_pragmatist: {
+    tagline: 'Cost & concentration',
+    metrics: 'Expense · HHI · Turnover',
+    description: 'The cost-conscious diversifier. Strongly prefers low-expense broad index funds over individual stocks. Scores on expense ratio (lower is better), portfolio concentration via HHI, and implied turnover. Will only propose buying funds — never individual equities. The counterweight to the stock-picking oracles.',
+    goal: 'Minimise cost and concentration drag',
+  },
+} as Record<string, { tagline: string; metrics: string; description: string; goal: string }>
 
 // Strip leading "The " so "The Quant" → "Quant" in compact contexts
 const ORACLE_SHORT = Object.fromEntries(
@@ -68,6 +98,37 @@ function OracleCardView({ card }: { card: OracleCard }) {
             {card.display_name}
           </h3>
         </div>
+
+        {/* Info tooltip */}
+        {meta && (
+          <div className="relative flex-shrink-0 group/tooltip">
+            <button
+              className="w-6 h-6 grid place-items-center rounded-md text-slate-600 hover:text-slate-400 transition-colors"
+              aria-label="Oracle philosophy"
+            >
+              <Info size={13} />
+            </button>
+            <div
+              className="absolute right-0 top-8 z-20 w-72 rounded-xl p-3.5 text-xs leading-relaxed
+                         opacity-0 pointer-events-none group-hover/tooltip:opacity-100 group-hover/tooltip:pointer-events-auto
+                         transition-opacity duration-150"
+              style={{
+                background: '#0f172a',
+                border: `1px solid ${color}44`,
+                boxShadow: `0 8px 32px #00000080, 0 0 0 1px ${color}22`,
+              }}
+            >
+              <p className="font-semibold text-slate-200 mb-1" style={{ color }}>
+                {meta.goal}
+              </p>
+              <p className="text-slate-400 mb-2">{meta.description}</p>
+              <p className="text-slate-600 font-mono text-[10px] uppercase tracking-wider">
+                Signals: {meta.metrics}
+              </p>
+            </div>
+          </div>
+        )}
+
         {card.abstained ? (
           <span
             className="flex-shrink-0 text-xs px-2 py-0.5 rounded-full font-mono"
@@ -200,7 +261,7 @@ function DissentMatrix({ rows, oracleAbstained }: { rows: DissentRow[]; oracleAb
   const oracles = ORACLE_IDS
 
   if (rows.length === 0) {
-    return <p className="text-slate-600 text-sm">No instruments with proposals.</p>
+    return <p className="text-slate-600 text-sm">No oracle scores yet — run Re-convene to populate.</p>
   }
 
   return (
@@ -282,15 +343,14 @@ function DissentMatrix({ rows, oracleAbstained }: { rows: DissentRow[]; oracleAb
                   const dir = cell.direction ?? 'hold'
                   const color = DIRECTION_COLOR[dir] ?? '#64748b'
                   const isHold = dir === 'hold'
+                  const hasScore = cell.score != null
                   return (
                     <td
                       key={cell.oracle_id}
                       className="px-2 py-2.5 text-center"
                       style={{ borderRight: '1px solid #1e293b' }}
                     >
-                      {isHold ? (
-                        <span className="text-slate-700 font-mono">—</span>
-                      ) : (
+                      {!isHold ? (
                         <span
                           className="inline-block px-2 py-0.5 rounded text-xs font-mono font-bold tracking-wider"
                           style={{
@@ -301,6 +361,15 @@ function DissentMatrix({ rows, oracleAbstained }: { rows: DissentRow[]; oracleAb
                         >
                           {dir.toUpperCase()}
                         </span>
+                      ) : hasScore ? (
+                        <span
+                          className="font-mono text-[11px] font-semibold"
+                          style={{ color: scoreColor(cell.score) }}
+                        >
+                          {fmtScore(cell.score)}
+                        </span>
+                      ) : (
+                        <span className="text-slate-700 font-mono">—</span>
                       )}
                     </td>
                   )
@@ -364,7 +433,15 @@ function ObjectionsList({ objections }: { objections: RivalObjection[] }) {
 
 // ── Empty / loading states ────────────────────────────────────────────────────
 
-function EmptyState({ error }: { error: string | null }) {
+function EmptyState({
+  error,
+  onConvene,
+  convening,
+}: {
+  error: string | null
+  onConvene: () => void
+  convening: boolean
+}) {
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6">
       <div className="flex flex-col items-center gap-4">
@@ -384,9 +461,14 @@ function EmptyState({ error }: { error: string | null }) {
         <p className="text-sm text-slate-600 text-center max-w-sm">
           No deliberation run found. Convene the oracles to populate the Dissent Matrix.
         </p>
-        <div className="mt-1 px-4 py-2.5 rounded-lg bg-slate-900 border border-slate-800 font-mono text-xs text-slate-400">
-          committee convene
-        </div>
+        <button
+          onClick={onConvene}
+          disabled={convening}
+          className="mt-1 flex items-center gap-2 px-4 py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sm text-slate-200 font-medium transition-colors disabled:opacity-50"
+        >
+          <RefreshCw size={14} className={convening ? 'animate-spin' : ''} />
+          {convening ? 'Convening…' : 'Convene the oracles'}
+        </button>
       </div>
       {error && (
         <details className="max-w-sm w-full">
@@ -405,24 +487,54 @@ function EmptyState({ error }: { error: string | null }) {
 
 // ── Chamber page ──────────────────────────────────────────────────────────────
 
+type DataOp = 'prices' | 'macro' | 'edgar' | 'sleeves' | 'bundles' | null
+
+async function dataPost(path: string): Promise<{ ok: boolean; message: string; count: number }> {
+  const res = await fetch(`/api/data/${path}`, { method: 'POST' })
+  const body = await res.json()
+  if (!res.ok) throw new Error(body.detail ?? res.statusText)
+  return body
+}
+
 export function Chamber() {
   const [data, setData] = useState<ChamberResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [convening, setConvening] = useState(false)
+  const [dataOp, setDataOp] = useState<DataOp>(null)
+  const [dataMsg, setDataMsg] = useState<string | null>(null)
   const [constraint, setConstraint] = useState('unconstrained')
   const [profiles, setProfiles] = useState<string[]>(['unconstrained'])
+  const [regime, setRegime] = useState<string>('neutral')
+  const [regimeSaving, setRegimeSaving] = useState(false)
+  const [bundles, setBundles] = useState<BundleInfo[]>([])
+  const [bundleToggling, setBundleToggling] = useState<string | null>(null)
 
   useEffect(() => {
     api.getLatestChamber().then(setData).catch(e => setError(String(e))).finally(() => setLoading(false))
+    fetch('/api/config/regime').then(r => r.json()).then(r => setRegime(r.tilt)).catch(() => {})
     api.getConfig().then(cfg => {
       if (cfg.available_profiles.length > 0) setProfiles(cfg.available_profiles)
     }).catch(() => {})
+    api.getBundles().then(setBundles).catch(() => {})
   }, [])
+
+  const handleBundleToggle = async (id: string, enabled: boolean) => {
+    setBundleToggling(id)
+    try {
+      const updated = await api.setBundleEnabled(id, enabled)
+      setBundles(prev => prev.map(b => b.id === id ? updated : b))
+    } catch (e) {
+      setError(String(e))
+    } finally {
+      setBundleToggling(null)
+    }
+  }
 
   const handleConvene = async () => {
     setConvening(true)
     setError(null)
+    setDataMsg(null)
     try {
       const result = await api.convene(constraint)
       setData(result)
@@ -430,6 +542,26 @@ export function Chamber() {
       setError(String(e))
     } finally {
       setConvening(false)
+    }
+  }
+
+  const handleDataOp = async (op: 'prices' | 'macro' | 'edgar' | 'sleeves' | 'bundles') => {
+    setDataOp(op)
+    setDataMsg(null)
+    setError(null)
+    try {
+      const paths: Record<string, string> = {
+        prices: 'fetch-prices', macro: 'fetch-macro',
+        edgar: 'fetch-edgar', sleeves: 'classify-sleeves',
+        bundles: 'seed-bundles',
+      }
+      const res = await dataPost(paths[op])
+      setDataMsg(res.message)
+      if (op === 'bundles') api.getBundles().then(setBundles).catch(() => {})
+    } catch (e) {
+      setError(String(e))
+    } finally {
+      setDataOp(null)
     }
   }
 
@@ -446,8 +578,7 @@ export function Chamber() {
       </div>
     </div>
   )
-  if (error && !data) return <EmptyState error={error} />
-  if (!data) return null
+  if (!data) return <EmptyState error={error} onConvene={handleConvene} convening={convening} />
 
   const abstainedOracles = new Set(
     data.oracle_cards.filter(c => c.abstained).map(c => c.oracle_id)
@@ -465,7 +596,7 @@ export function Chamber() {
             {data.scenario_id && <span className="ml-2 text-violet-400">scenario: {data.scenario_id}</span>}
           </p>
         </div>
-        {/* Stat pill + convene controls */}
+        {/* Data refresh + convene controls */}
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs font-mono">
             <span className="text-slate-300 font-semibold">{data.oracle_cards.length}</span>
@@ -478,6 +609,51 @@ export function Chamber() {
               </>
             )}
           </div>
+          <button
+            onClick={() => handleDataOp('prices')}
+            disabled={!!dataOp || convening}
+            title="Fetch 90-day prices for held instruments"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700 disabled:opacity-40"
+          >
+            <TrendingUp size={13} className={dataOp === 'prices' ? 'animate-pulse' : ''} />
+            {dataOp === 'prices' ? 'Fetching…' : 'Fetch prices'}
+          </button>
+          <button
+            onClick={() => handleDataOp('macro')}
+            disabled={!!dataOp || convening}
+            title="Fetch FRED macro series (yield curve, VIX, CPI…)"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700 disabled:opacity-40"
+          >
+            <BarChart2 size={13} className={dataOp === 'macro' ? 'animate-pulse' : ''} />
+            {dataOp === 'macro' ? 'Fetching…' : 'Fetch macro'}
+          </button>
+          <button
+            onClick={() => handleDataOp('edgar')}
+            disabled={!!dataOp || convening}
+            title="Fetch annual fundamentals from SEC EDGAR (P/E, D/E, revenue…)"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700 disabled:opacity-40"
+          >
+            <FileText size={13} className={dataOp === 'edgar' ? 'animate-pulse' : ''} />
+            {dataOp === 'edgar' ? 'Fetching…' : 'Fetch EDGAR'}
+          </button>
+          <button
+            onClick={() => handleDataOp('sleeves')}
+            disabled={!!dataOp || convening}
+            title="Auto-assign equity_us / fixed_income / alternatives sleeves to unclassified instruments"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700 disabled:opacity-40"
+          >
+            <Tag size={13} className={dataOp === 'sleeves' ? 'animate-pulse' : ''} />
+            {dataOp === 'sleeves' ? 'Classifying…' : 'Classify sleeves'}
+          </button>
+          <button
+            onClick={() => handleDataOp('bundles')}
+            disabled={!!dataOp || convening}
+            title="Seed all bundle instruments (ETF Core, Dow 30, Nasdaq Top 50)"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700 disabled:opacity-40"
+          >
+            <Boxes size={13} className={dataOp === 'bundles' ? 'animate-pulse' : ''} />
+            {dataOp === 'bundles' ? 'Seeding…' : 'Seed bundles'}
+          </button>
           <select
             value={constraint}
             onChange={e => setConstraint(e.target.value)}
@@ -486,9 +662,36 @@ export function Chamber() {
           >
             {profiles.map(p => <option key={p} value={p}>{p}</option>)}
           </select>
+          <select
+            value={regime}
+            onChange={async e => {
+              const next = e.target.value
+              setRegimeSaving(true)
+              try {
+                const res = await fetch('/api/config/regime', {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ tilt: next }),
+                })
+                if (res.ok) setRegime(next)
+              } finally {
+                setRegimeSaving(false)
+              }
+            }}
+            disabled={convening || regimeSaving}
+            title="Override the macro regime tilt (takes effect on next Re-convene)"
+            className="bg-slate-900 border border-slate-700 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none disabled:opacity-50 font-mono"
+            style={{
+              color: regime === 'defensive' ? '#f87171' : regime === 'aggressive' ? '#4ade80' : '#94a3b8'
+            }}
+          >
+            <option value="neutral">neutral</option>
+            <option value="aggressive">aggressive</option>
+            <option value="defensive">defensive</option>
+          </select>
           <button
             onClick={handleConvene}
-            disabled={convening}
+            disabled={convening || !!dataOp}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 disabled:opacity-50"
           >
             <RefreshCw size={13} className={convening ? 'animate-spin' : ''} />
@@ -499,6 +702,49 @@ export function Chamber() {
       {error && (
         <div className="px-4 py-2 rounded-lg bg-rose-950/30 border border-rose-900/40 text-xs text-rose-400 font-mono">
           {error}
+        </div>
+      )}
+      {dataMsg && (
+        <div className="px-4 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs text-slate-400 font-mono flex items-center justify-between">
+          <span>{dataMsg}</span>
+          <button onClick={() => setDataMsg(null)} className="text-slate-600 hover:text-slate-400 ml-4">✕</button>
+        </div>
+      )}
+
+      {/* Bundle toggles */}
+      {bundles.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-slate-600 font-medium uppercase tracking-wider mr-1">
+            Buy universe
+          </span>
+          {bundles.map(bundle => {
+            const isToggling = bundleToggling === bundle.id
+            return (
+              <button
+                key={bundle.id}
+                onClick={() => handleBundleToggle(bundle.id, !bundle.enabled)}
+                disabled={!!bundleToggling || !!dataOp || convening}
+                title={bundle.display_name}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all border disabled:opacity-50 ${
+                  bundle.enabled
+                    ? 'bg-indigo-950/60 border-indigo-600/50 text-indigo-300 hover:bg-indigo-950/80'
+                    : 'bg-slate-900 border-slate-700 text-slate-500 hover:text-slate-300 hover:border-slate-600'
+                }`}
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                    isToggling ? 'animate-pulse bg-indigo-400' :
+                    bundle.enabled ? 'bg-indigo-400' : 'bg-slate-700'
+                  }`}
+                />
+                {bundle.id.replace(/_/g, ' ')}
+                <span className="font-mono opacity-60">{bundle.instrument_count}</span>
+              </button>
+            )
+          })}
+          <span className="text-xs text-slate-700 font-mono">
+            {bundles.filter(b => b.enabled).reduce((s, b) => s + b.instrument_count, 0)} instruments active
+          </span>
         </div>
       )}
 

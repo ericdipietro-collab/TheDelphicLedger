@@ -113,6 +113,37 @@ def _price_history(
     return result
 
 
+def _distribution_yields(
+    session: Session, pit_date: date | None = None
+) -> dict[int, float]:
+    """Latest distribution_yield per instrument (bulk fetch — fund-specific unit)."""
+    where = [
+        MarketObservation.instrument_id.isnot(None),
+        MarketObservation.unit == "distribution_yield",
+    ]
+    if pit_date is not None:
+        where.append(MarketObservation.observed_date <= pit_date)
+    subq = (
+        select(
+            MarketObservation.instrument_id,
+            func.max(MarketObservation.observed_date).label("max_date"),
+        )
+        .where(*where)
+        .group_by(MarketObservation.instrument_id)
+        .subquery()
+    )
+    rows = session.execute(
+        select(MarketObservation.instrument_id, MarketObservation.value)
+        .join(
+            subq,
+            (MarketObservation.instrument_id == subq.c.instrument_id)
+            & (MarketObservation.observed_date == subq.c.max_date),
+        )
+        .where(MarketObservation.unit == "distribution_yield")
+    ).all()
+    return {row[0]: float(row[1]) for row in rows if row[0] is not None}
+
+
 def _annual_dividends(
     session: Session, pit_date: date | None = None
 ) -> dict[int, list[tuple[date, float]]]:
@@ -229,31 +260,37 @@ def compute_universe_metrics(
     prices = _latest_prices(session, pit_date=pit_date)
     price_history = _price_history(session, days_back=400, pit_date=pit_date)
     dividends = _annual_dividends(session, pit_date=pit_date)
+    dist_yields = _distribution_yields(session, pit_date=pit_date)
 
     eps = _latest_fundamental(session, "eps_diluted", pit_date=pit_date)
     equity = _latest_fundamental(session, "equity", pit_date=pit_date)
     total_debt = _latest_fundamental(session, "total_debt", pit_date=pit_date)
     expense_raw = _latest_fundamental(session, "expense_ratio", pit_date=pit_date)
 
-    # Revenue: two most-recent annual periods per instrument for YoY
-    rev_where = [Fundamental.metric == "revenue"]
-    if pit_date is not None:
-        rev_where.append(or_(
-            and_(Fundamental.filed_at.isnot(None), Fundamental.filed_at <= pit_date),
-            and_(Fundamental.filed_at.is_(None), Fundamental.period_end <= pit_date),
-        ))
-    revenue_rows = session.execute(
-        select(
-            Fundamental.instrument_id,
-            Fundamental.period_end,
-            Fundamental.value,
-        )
-        .where(*rev_where)
-        .order_by(Fundamental.instrument_id, Fundamental.period_end.desc())
-    ).all()
-    revenue_by_inst: dict[int, list[tuple[date, float]]] = {}
-    for iid, pend, val in revenue_rows:
-        revenue_by_inst.setdefault(iid, []).append((pend, float(val)))
+    # Revenue + gross_profit: two most-recent annual periods per instrument for YoY
+    def _fetch_two_period_fundamental(metric: str) -> dict[int, list[tuple[date, float]]]:
+        where = [Fundamental.metric == metric]
+        if pit_date is not None:
+            where.append(or_(
+                and_(Fundamental.filed_at.isnot(None), Fundamental.filed_at <= pit_date),
+                and_(Fundamental.filed_at.is_(None), Fundamental.period_end <= pit_date),
+            ))
+        rows = session.execute(
+            select(
+                Fundamental.instrument_id,
+                Fundamental.period_end,
+                Fundamental.value,
+            )
+            .where(*where)
+            .order_by(Fundamental.instrument_id, Fundamental.period_end.desc())
+        ).all()
+        result: dict[int, list[tuple[date, float]]] = {}
+        for iid, pend, val in rows:
+            result.setdefault(iid, []).append((pend, float(val)))
+        return result
+
+    revenue_by_inst = _fetch_two_period_fundamental("revenue")
+    gross_profit_by_inst = _fetch_two_period_fundamental("gross_profit")
 
     # Find SPY instrument for beta computation (ticker = "SPY")
     spy_row = session.execute(
@@ -418,23 +455,25 @@ def compute_universe_metrics(
         m["concentration_hhi"] = w * w if w is not None else None  # weight^2 = HHI contribution
         m["individual_stock_pct"] = individual_stock_pct if iid in holding_weights else None
 
-        # Fund distribution yield: fund-specific unit
-        fy_where = [
-            MarketObservation.instrument_id == iid,
-            MarketObservation.unit == "distribution_yield",
-        ]
-        if pit_date is not None:
-            fy_where.append(MarketObservation.observed_date <= pit_date)
-        fund_yield_rows = session.execute(
-            select(MarketObservation.value)
-            .where(*fy_where)
-            .order_by(MarketObservation.observed_date.desc())
-            .limit(1)
-        ).scalar_one_or_none()
-        m["fund_distribution_yield"] = float(fund_yield_rows) if fund_yield_rows else None
+        # Fund distribution yield (pre-fetched in bulk — no per-instrument query)
+        m["fund_distribution_yield"] = dist_yields.get(iid)
 
-        # Gross margin YoY: needs gross_profit fundamentals (often absent)
-        m["gross_margin_yoy"] = None  # Data not typically fetched yet; returns n/a
+        # Gross margin YoY: gross_profit / revenue per period → YoY of that ratio
+        gp_periods = gross_profit_by_inst.get(iid, [])
+        rev_periods = revenue_by_inst.get(iid, [])
+        if len(gp_periods) >= 2 and len(rev_periods) >= 2:
+            rev_cur = rev_periods[0][1]
+            rev_prior = rev_periods[1][1]
+            gp_cur = gp_periods[0][1]
+            gp_prior = gp_periods[1][1]
+            if rev_cur > 0 and rev_prior > 0:
+                gm_cur = gp_cur / rev_cur
+                gm_prior = gp_prior / rev_prior
+                m["gross_margin_yoy"] = gm_cur - gm_prior
+            else:
+                m["gross_margin_yoy"] = None
+        else:
+            m["gross_margin_yoy"] = None
 
         # P/B and FCF yield: need shares outstanding (not yet in EDGAR fetch)
         m["pb_ratio"] = None

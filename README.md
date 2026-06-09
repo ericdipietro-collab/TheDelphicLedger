@@ -1,298 +1,230 @@
-<div align="center">
+# Delphic Ledger
 
-<img src="docs/logo.svg" alt="The Delphic Ledger" width="220"/>
-
-# The Delphic Ledger
-
-> *"Know thy holdings."* — after the inscription at the Temple of Apollo at Delphi
-
-**Six oracles. Zero consensus. No predictions.**
-
-[![CI](https://github.com/ericdipietro-collab/TheDelphicLedger/actions/workflows/ci.yml/badge.svg)](https://github.com/ericdipietro-collab/TheDelphicLedger/actions/workflows/ci.yml)
-[![Python 3.12](https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white)](https://python.org)
-[![License: MIT](https://img.shields.io/badge/license-MIT-22c55e)](LICENSE)
-[![uv](https://img.shields.io/badge/uv-package%20manager-7C3AED)](https://github.com/astral-sh/uv)
-
-</div>
+A personal portfolio analysis tool built as an engineering showcase. Runs entirely locally — no cloud accounts, no broker integrations, no trade execution. Not investment advice.
 
 ---
 
-A personal portfolio analysis tool and engineering showcase. Import real positions and transactions from broker CSVs, reconcile them against a transaction ledger, enrich them with market data and SEC filings, then convene six investor archetypes who score the portfolio through incompatible philosophies and propose conflicting rebalancing trades.
+## What it does
 
-**This is not a portfolio optimizer. It is a structured disagreement engine built on production-grade financial data mechanics.** No advice. No execution. No predictions. The oracles exist to make you think harder — not to think for you.
+Delphic Ledger imports brokerage export files (Schwab, Fidelity, Vanguard), then runs six independent scoring oracles against your holdings to surface conviction from multiple investment philosophies simultaneously. A shared rebalancer converts oracle output into trade proposals that respect drift bands, tax account placement, and your chosen constraint profile.
 
----
-
-## Why this is different from other portfolio tools
-
-Most portfolio analysis tools are optimization engines. They take your holdings and find the mathematically optimal reallocation — minimize variance, maximize Sharpe, target a frontier.
-
-Six investor archetypes — a value purist, a growth visionary, a yield harvester, a macro tactician, a quant, and a passive pragmatist — each score your portfolio through an incompatible lens. They propose conflicting trades. They object to each other's reasoning. The Dissent Matrix shows you everywhere they disagree.
-
-The disagreement is not a bug to be resolved. It's the point. Real investors disagree about the same data. Making that disagreement explicit — and tracking it in an immutable audit log — is what this project demonstrates.
+The dashboard lets you explore each oracle's take, compare disagreements across the panel, run scenario stress tests, and review reconciliation breaks — all without sending your data anywhere.
 
 ---
 
-## Dashboard
+## The Six Oracles
 
-<div align="center">
+Each oracle represents a distinct investment philosophy. They score independently and never share state.
 
-| The Chamber | Portfolio |
-|:---:|:---:|
-| ![The Chamber — six oracle verdicts, dissent matrix, rivals' objections](docs/screenshots/dashboard-chamber.png) | ![Portfolio — allocation donut, drift bar chart, holdings table](docs/screenshots/dashboard-portfolio.png) |
+| Oracle | Philosophy | Signals |
+|---|---|---|
+| **The Value Purist** | Margin of safety — only buys below intrinsic value | P/E, P/B, FCF yield, D/E |
+| **The Growth Visionary** | Own category winners before consensus catches up | Revenue YoY, gross margin trend, 6-month momentum |
+| **The Yield Harvester** | Income first — the check must clear | Distribution yield, payout ratio, dividend growth streak |
+| **The Macro Tactician** | Right-size risk for the current regime | Yield curve, CPI, DXY, VIX, credit spreads |
+| **The Quant** | Humans are biased; price signals are not | RSI(14), 50/200 MA cross, 12-1 momentum, beta vs SPY |
+| **The Passive Pragmatist** | Minimise cost and concentration drag | Expense ratio, HHI, implied turnover |
 
-</div>
-
----
-
-## Disclaimer
-
-**Not investment advice.** This tool is for personal entertainment and educational purposes only. It produces theoretical trade proposals; a human decides what, if anything, to do. The author makes no market calls, offers no guidance, and operates no service for others. All outputs are local and gitignored. Use at your own risk and consult a qualified financial professional for actual investment decisions.
-
----
-
-## What this demonstrates
-
-This project is an engineering showcase for capital-markets data architecture:
-
-| Capability | Where |
-|---|---|
-| **Entity resolution with human-in-the-loop conformance** | `committee resolve` — fuzzy-match instrument names, queue ambiguous cases, require human confirmation for below-threshold matches |
-| **Event-sourced reconciliation** | `committee recon` — roll forward transaction ledger between snapshots; flag qty breaks; never mutate source records |
-| **Constraint-based portfolio logic** | `profiles/*.yaml` — declarative constraint profiles (fund-only, min yield, etc.) consumed by a single shared rebalancer |
-| **Deterministic what-if replay** | `committee scenario gfc-2008` — shock sleeve MVs and re-run all oracles; audit row marks it a scenario |
-| **Point-in-time data discipline** | `committee backtest` — oracle scores only see data stamped ≤ replay date; lookahead test enforces this |
-| **Hysteresis state machine** | Macro Tactician regime FSM — asymmetric entry/exit bands, two-run confirmation, circuit breaker |
-| **Immutable audit log** | Every convene/dissent/deviation writes a row; no UPDATE/DELETE on source records ever |
+The Macro Tactician is special: it reads macro signals to set sleeve-level allocation targets (equity, fixed income, alternatives) rather than scoring individual securities. Every other oracle scores holdings and proposes trades; the Tactician sets the weights the others must satisfy.
 
 ---
 
 ## Architecture
 
 ```
- broker CSVs (positions, transactions)
-        │
-        ▼
- ┌──────────────────────────────────────────────┐
- │ INGEST  raw batches (immutable, hashed)      │
- │  header mapper <-> user-corrected templates  │
- │  instrument resolver -> mapping_decisions    │
- │  unresolved queue -> human confirm           │
- └──────────────┬───────────────────────────────┘
-                ▼
- ┌──────────────────────────────────────────────┐
- │ CORE  instruments (security master)          │
- │       position_snapshots · transactions      │
- │       lots · holdings (derived, household)   │
- │       recon_breaks                           │
- └──────┬──────────────────────────┬────────────┘
-        ▼                          ▼
- ┌──────────────────┐   ┌─────────────────────────┐
- │ MARKET DATA      │   │ RECON ENGINE            │
- │ prices · FRED    │   │ qty roll-forward between│
- │ EDGAR XBRL/8-K   │   │ snapshots vs txn ledger │
- │ universe loader  │   └─────────────────────────┘
- └──────┬───────────┘
-        ▼
- ┌──────────────────────────────────────────────┐
- │ ORACLES (6 persona configs)                  │
- │ each: per-holding scores + sleeve targets    │
- │       + persona constraints                  │
- └──────────────┬───────────────────────────────┘
-                ▼
- ┌──────────────────────────────────────────────┐
- │ REBALANCER (single, shared)                  │
- │ f(scores, targets, holdings, lots,           │
- │   constraint profile) -> TradeProposal       │
- └──────────────┬───────────────────────────────┘
-                ▼
- ┌──────────────────────────────────────────────┐
- │ OUTPUT  CLI (committee ...) · local web      │
- │ dashboard · decision audit log · scenarios   │
- └──────────────────────────────────────────────┘
+Import (CSV/XLSX)
+    └─ Ledger engine  ─── Holdings (transaction roll-forward or snapshot)
+                              │
+                         6× Oracle runs
+                         (score per holding, sleeve targets)
+                              │
+                         Shared Rebalancer
+                         (drift detection → trade proposals)
+                              │
+                         FastAPI  ──  React Dashboard
 ```
 
-**Key invariant:** oracles emit `(per_holding_scores, sleeve_targets, persona_constraints)` — never trades. One shared rebalancer produces all trades. Import-linter enforces this in CI.
+**Key invariants (never violated):**
+
+- **Oracles never emit trades.** They emit scores, sleeve targets, and persona constraints. One rebalancer turns that into proposals.
+- **Source records are immutable.** Import batches, position snapshots, and transactions are never updated or deleted after write.
+- **No LLM in any decision path.** All scoring is deterministic pure Python reproducible from the same inputs. The narration layer (oracle "voice" text) is off by default and never feeds back into scoring.
+- **`Decimal` everywhere.** All monetary amounts and share quantities use `decimal.Decimal` — never `float`.
+- **No fabricated metrics.** Every number is either computed from a sourced input or rendered as `n/a`. Stale data is flagged, not silently carried forward.
 
 ---
 
-## The Six Oracles
+## Stack
 
-| Oracle | Philosophy | Drift from consensus |
-|---|---|---|
-| **The Value Purist** | P/E, P/B, FCF yield; moats matter | Ignores momentum entirely |
-| **Growth Visionary** | Revenue growth, margin expansion | Pays up; ignores current valuations |
-| **Yield Harvester** | Dividend yield, payout coverage | Avoids low-yield equities |
-| **Macro Tactician** | Regime FSM: yield curve, credit spreads, VIX, Sahm | Tilts sleeves; ignores individual securities |
-| **The Quant** | Momentum, RSI, beta, MA-cross | Ignores fundamentals |
-| **Passive Pragmatist** | Expense ratio, diversification, drift | Scores no individual securities; votes no-change |
-
-Each oracle scores through its own philosophy. They frequently disagree. That disagreement is the point.
-
----
-
-## The Pre-committed Pass Bar
-
-The Macro Tactician's regime tilt earns live influence only if it passes a pre-stated bar (evaluated in `committee backtest`):
-
-- Cuts max drawdown **≥20% relative** to the Passive Pragmatist benchmark
-- Costs **≤1% CAGR** vs. the benchmark
-- Produces **fewer than 10 regime switches per decade**
-
-Fails any criterion → Macro Tactician falls back to neutral allocation and is labeled **entertainment-only** in `committee dissent`. This is not a post-hoc rationalization — the bar is committed in `backtest/engine.py` before the backtest runs.
+| Layer | Technology |
+|---|---|
+| Language | Python 3.12 |
+| Package manager | uv |
+| ORM / DB | SQLAlchemy + SQLite (Postgres-ready via connection string) |
+| CLI | Typer + Rich |
+| Tests | pytest (280+ tests) |
+| Linter / formatter | ruff |
+| Type checking | mypy strict on core layers |
+| Dashboard API | FastAPI (local-only, binds 127.0.0.1) |
+| Dashboard UI | React + Vite + Tailwind + Recharts |
+| Market data | Tiingo (API key) or yfinance (fallback, no key) |
+| Macro data | FRED (St. Louis Fed public API) |
+| Fundamentals | SEC EDGAR XBRL |
 
 ---
 
-## Installation
+## Prerequisites
+
+- Python 3.12+
+- [uv](https://docs.astral.sh/uv/) — `pip install uv` or `curl -LsSf https://astral.sh/uv/install.sh | sh`
+- Node.js 18+ (for the dashboard)
+
+Optional but recommended:
+- `TIINGO_API_KEY` env var — faster, more reliable price fetches than yfinance
+- `FRED_API_KEY` env var — FRED macro data (free key from [fred.stlouisfed.org](https://fred.stlouisfed.org/docs/api/api_key.html))
+
+---
+
+## Setup
 
 ```bash
-git clone https://github.com/ericdipietro-collab/TheDelphicLedger
+# Clone and install Python dependencies
+git clone https://github.com/<you>/DelphiLedger.git
 cd DelphiLedger
 uv sync
-uv run committee --help
-```
 
-Requirements: Python 3.12+, [uv](https://github.com/astral-sh/uv), Node.js v18+ (for dashboard build).
-
-`pip install delphic-ledger` → `committee --help` (once published to PyPI).
-
----
-
-## Synthetic walkthrough
-
-This walkthrough uses only synthetic data. No real portfolio data is needed.
-
-### 1. Seed the demo database
-
-```bash
-uv run committee demo
-```
-
-Seeds 5 synthetic Vanguard instruments, a demo account, holdings, and macro market data. Runs all six oracles. No interactive prompts.
-
-To seed and open the dashboard in one step:
-
-```bash
-uv run committee demo --open
-```
-
-(Requires Node.js v18+ for the first-run dashboard build.)
-
-### 2. Reconcile
-
-```bash
-uv run committee recon run
-uv run committee recon list
-```
-
-Rolls forward the transaction ledger between position snapshots. Lists any quantity breaks.
-
-### 3. Convene the committee
-
-```bash
-uv run committee convene
-```
-
-Runs all six oracles, proposes trades per oracle, writes audit rows.
-
-### 4. Inspect disagreements
-
-```bash
-uv run committee dissent
-```
-
-Side-by-side: which oracle buys/sells each instrument, and which rivals object to each other's proposals.
-
-### 5. Run a scenario
-
-```bash
-uv run committee scenario gfc-2008
-```
-
-Shocks sleeve market values per the pack's calibrated factors. Re-runs all oracles. See how each philosophy responds to a 40% equity drawdown.
-
-### 6. Backtest the tilt
-
-```bash
-uv run committee backtest --from 2022-01-01 --perturb
-```
-
-Point-in-time replay of Macro Tactician's regime tilt vs. Passive Pragmatist benchmark. Reports CAGR, max drawdown, Ulcer index, switch counts, pass-bar verdict, and ±50% drift-parameter sensitivity.
-
-### 7. Launch the dashboard
-
-```bash
-uv run committee serve --db data/demo.db
-```
-
-Opens `http://127.0.0.1:7777` — six oracle cards, dissent matrix, portfolio donut, drift gauges, trade proposals, scenario theater, recon view.
-
----
-
-## Project structure
-
-```
-src/committee/
-  ingest/       CSV parsing, header mapping, batch tracking
-  resolver/     Fuzzy instrument resolution, unresolved queue
-  core/         Shared types, holdings derivation
-  market/       Price fetcher, FRED, EDGAR XBRL cache
-  signals/      Macro signals, regime FSM (composite, regime)
-  oracles/      Six oracle configs + runner + metric computation
-  rebalancer/   Shared rebalancer, constraint profiles, drift engine
-  recon/        Quantity reconciliation engine
-  lots/         Tax lot derivation (FIFO + fallback), unwind analysis
-  scenarios/    YAML scenario packs (historical + hypothetical)
-  backtest/     Point-in-time backtest engine, pass-bar evaluation
-  api/          FastAPI read-only local API (never 0.0.0.0)
-  cli.py        Typer entry point
-oracles/        YAML persona configs (one per oracle)
-scenarios/      YAML scenario packs (6 frozen packs)
-profiles/       Constraint profiles (personal profiles gitignored)
-dashboard/      React + Vite + Recharts frontend
-tests/          280 tests across all modules
-docs/ADR/       Architecture decision records
+# Install dashboard dependencies
+cd dashboard && npm install && cd ..
 ```
 
 ---
 
-## Honest limitations
+## Usage
 
-**Tactical value is episodic.** The Macro Tactician's tilt has shown value in some regimes and been noise in others. The pass-bar exists to discipline this honestly.
+### Import your holdings
 
-**Parameter humility.** Run `committee backtest --perturb` to see how sensitive results are to ±50% changes in the drift band. If the outcome flips, the result is fragile.
+Export a positions/transactions CSV from your broker (Schwab, Fidelity, or Vanguard) and import:
 
-**The real edge is discipline, not prophecy.** This tool's value is:
-- Forcing you to articulate what you own and why
-- Maintaining a clean audit trail of every trade proposal and deviation
-- Tax-lot awareness before selling
-- Drift control against stated targets
-- Scenario discipline (shocks, not optimism)
+```bash
+uv run committee import path/to/positions.csv
+uv run committee import path/to/transactions.csv   # optional — enables transaction roll-forward
+```
 
-The oracles are entertainment wrapped around that discipline.
+### Fetch market data
 
-**No forward-looking metrics.** No expected returns are estimated. No DCF. No price targets. Oracles score current observable data against their philosophies.
+```bash
+uv run committee fetch-prices    # EOD prices (Tiingo or yfinance)
+uv run committee fetch-macro     # FRED macro series (yield curve, CPI, VIX, etc.)
+uv run committee fetch-edgar     # SEC fundamentals (P/E, FCF, revenue growth)
+```
+
+### Run the committee
+
+```bash
+uv run committee convene         # Run all six oracles, generate trade proposals
+uv run committee dissent         # Show disagreements across oracles
+```
+
+### Start the dashboard
+
+```bash
+uv run committee serve           # Starts FastAPI on 127.0.0.1:8000
+cd dashboard && npm run dev      # Vite dev server on localhost:5173
+```
+
+Open [http://localhost:5173](http://localhost:5173).
 
 ---
 
-## Development
+## Dashboard
+
+The dashboard is organized around five views:
+
+**Chamber** — The main view. Oracle cards show each oracle's convictions with scores, sleeve targets, and the macro regime. A dissent matrix highlights where oracles disagree. Bundle toggles let you expand the buy universe beyond your current holdings (ETF Core, Dow 30, Nasdaq Top 50, S&P 500 snapshot, Russell 2000 snapshot).
+
+**Portfolio** — Holdings table with sleeve allocations, drift gauges, and per-oracle scores side by side for each position.
+
+**Trades** — Proposed rebalancing trades from the latest convene, with rationale tags, oracle scores, and tax notes. Supports recomputing with custom drift bands, minimum trade size, and new-money deployment.
+
+**Scenarios** — Stress test packs that apply predefined market shocks (equity drawdown, rate spike, credit spread blowout) and show how the committee's proposals change.
+
+**Recon** — Reconciliation breaks between expected and actual positions, with suggested causes and coverage gap flags.
+
+---
+
+## Buy universe / bundle system
+
+By default the rebalancer only proposes buys among your current holdings. To let it propose new positions, seed and enable instrument bundles from the Chamber dashboard:
+
+1. Click **Seed bundles** — registers all bundle instruments in the database
+2. Click the toggle pills to enable the bundle(s) you want (e.g. *etf core*)
+3. Click **Fetch prices** — downloads EOD prices for the newly-activated universe
+4. Click **Re-convene** — the rebalancer now considers universe instruments as buy candidates
+
+Subsequent "Fetch prices" runs skip instruments with recent data (3-day freshness window), so re-fetching after enabling an additional bundle only downloads the new instruments.
+
+Available bundles:
+
+| Bundle | Contents |
+|---|---|
+| ETF Core | ~80 diversified ETFs (equity, fixed income, sectors, factors, international) |
+| Dow 30 | 30 DJIA components |
+| Nasdaq Top 50 | 50 largest Nasdaq-listed stocks |
+| S&P 500 | Static snapshot of ~450 index components |
+| Russell 2000 | Representative ~300 small-cap stocks |
+
+---
+
+## Configuration
+
+Engine parameters are adjustable from the dashboard Config panel or via API:
+
+| Parameter | Default | Description |
+|---|---|---|
+| `drift_abs` | 5% | Absolute sleeve drift before rebalancing triggers |
+| `drift_rel` | 25% | Relative sleeve drift before rebalancing triggers |
+| `min_trade_usd` | $200 | Minimum trade size (filters noise) |
+| `new_money` | $0 | Fresh cash to deploy before any sells |
+
+Constraint profiles (e.g. `funds_only`) can be passed at convene time to restrict the trade universe.
+
+---
+
+## Running tests
 
 ```bash
-uv sync --extra dev
 uv run pytest
-uv run ruff check src/
 ```
 
-Import constraints are enforced by `import-linter`:
-
-```bash
-uv run lint-imports
-```
+280+ tests covering the oracle scoring pipeline, rebalancer engine, reconciliation, API routes, and scenario stress tests.
 
 ---
 
-## License
+## Non-goals
 
-MIT. See LICENSE.
+This project intentionally does not:
 
-The author never operates this tool as a service. This is a locally run personal tool and engineering demonstration.
+- Host or serve multiple users
+- Integrate with any broker API or execute trades
+- Use any LLM in scoring, regime detection, or trade proposal logic
+- Predict returns or publish market calls
+- Run in CI against live market data
+
+---
+
+## Project status
+
+| Milestone | Status |
+|---|---|
+| M1 — Schema, import, mapping, holdings | Complete |
+| M2 — Market data, bundle system, FRED, EDGAR | Complete |
+| M3 — Reconciliation engine | Complete |
+| M4 — Oracles, rebalancer, constraint profiles | Complete |
+| M5 — Scenario packs | Complete |
+| M6 — Tax lots, unwind queue | Complete |
+| M7 — Dashboard (FastAPI + React) | Complete |
+| M8 — Backtest, docs, demo | In progress |
+
+---
+
+*Personal portfolio analysis and engineering showcase. Locally run. Not investment advice.*

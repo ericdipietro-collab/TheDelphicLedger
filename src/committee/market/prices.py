@@ -59,20 +59,34 @@ class YfinanceAdapter:
     source_name = "yfinance"
 
     def fetch_eod(self, ticker: str, start: date, end: date) -> list[PriceObs]:
+        import logging
+
         import yfinance as yf  # imported lazily: optional dep
 
-        df = yf.download(ticker, start=start, end=end, progress=False, auto_adjust=True)
+        # Suppress yfinance's own stderr/logger chatter (404s, delisted warnings).
+        # Errors still propagate as exceptions — we just don't want them in the
+        # server console for expected cases like preferred stock tickers.
+        logging.getLogger("yfinance").setLevel(logging.CRITICAL)
+
+        # .history() returns a flat DataFrame regardless of yfinance version.
+        # yf.download() with newer versions emits MultiIndex columns that make
+        # row["Close"] return a one-element Series, which breaks truthiness tests.
+        hist = yf.Ticker(ticker).history(start=start, end=end, auto_adjust=True)
         result = []
-        for idx, row in df.iterrows():
-            close_val = row.get("Close") or row.get("Adj Close")
-            if close_val is None:
+        for idx, row in hist.iterrows():
+            close_raw = row.get("Close")
+            if close_raw is None:
                 continue
+            close_f = float(close_raw.iloc[0] if hasattr(close_raw, "iloc") else close_raw)
+            if close_f == 0.0:
+                continue
+            div_raw = row.get("Dividends", 0)
+            div_f = float(div_raw.iloc[0] if hasattr(div_raw, "iloc") else div_raw)
             result.append(
                 PriceObs(
                     observed_date=idx.date(),
-                    # Decimal(str(...)) avoids float contamination from pandas
-                    adj_close=Decimal(str(float(close_val))),
-                    dividend=Decimal("0"),
+                    adj_close=Decimal(str(close_f)),
+                    dividend=Decimal(str(div_f)),
                 )
             )
         return result

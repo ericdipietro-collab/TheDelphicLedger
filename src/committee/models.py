@@ -4,7 +4,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import JSON, Date, DateTime, ForeignKey, Integer, Text, func
+from sqlalchemy import Index, JSON, Date, DateTime, ForeignKey, Integer, Text, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from committee.types import DecimalText
@@ -20,7 +20,7 @@ class ImportBatch(Base):
     __tablename__ = "import_batches"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    file_hash: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    file_hash: Mapped[str] = mapped_column(Text, nullable=False)
     original_filename: Mapped[str] = mapped_column(Text, nullable=False)
     file_type: Mapped[str] = mapped_column(Text, nullable=False)  # "positions" | "transactions"
     broker_fingerprint: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -219,6 +219,15 @@ class MarketObservation(Base):
     """Append-only market data: prices, macro indicators, dividends."""
 
     __tablename__ = "market_observations"
+    __table_args__ = (
+        # Covers the three hot query patterns in metrics.py and engine.py:
+        # 1. Latest price per instrument (instrument_id, unit, observed_date DESC)
+        # 2. Price history range scan (same columns + date range)
+        # 3. Freshness check in fetch-prices (instrument_id, unit)
+        Index("ix_mo_instrument_unit_date", "instrument_id", "unit", "observed_date"),
+        # FRED/macro series queries (series_id, observed_date)
+        Index("ix_mo_series_date", "series_id", "observed_date"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     source: Mapped[str] = mapped_column(Text, nullable=False)
@@ -293,6 +302,20 @@ class BundleState(Base):
     last_refreshed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     instrument_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class UniverseEntry(Base):
+    """Instruments available as buy candidates even when not currently held."""
+
+    __tablename__ = "universe"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    instrument_id: Mapped[int] = mapped_column(
+        ForeignKey("instruments.id"), nullable=False, unique=True
+    )
+    added_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
 
 
 class Deviation(Base):

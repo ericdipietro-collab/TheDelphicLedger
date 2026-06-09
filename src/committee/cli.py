@@ -206,11 +206,13 @@ def resolve(
                         candidate_insts.append(inst)
                         console.print(f"    [{len(candidate_insts)}] {inst.ticker or '?'} — {inst.name} (score {score})")
 
-            console.print(
+            # Rich interprets [x] as markup — use \[ to emit a literal bracket
+            opts = (
                 "\n  Options: "
-                + ("[a]ccept candidate  " if candidate_insts else "")
-                + "[s]earch  [c]reate  [m]ark-cash  [k]eep  [q]uit"
+                + ("(a) accept candidate  " if candidate_insts else "")
+                + "(s) map to ticker  (c) create new  (m) mark cash  (k) keep / skip  (q) quit"
             )
+            console.print(opts)
             choice = typer.prompt("  Enter choice", default="k").strip().lower()
 
             if choice == "q":
@@ -235,17 +237,37 @@ def resolve(
                         continue
 
             elif choice == "s":
-                ticker_in = typer.prompt("  Ticker or FIGI").strip().upper()
+                ticker_in = typer.prompt("  Ticker").strip().upper()
                 found = session.execute(
                     select(Instrument).where(Instrument.ticker == ticker_in)
                 ).scalar_one_or_none()
                 if found is None:
-                    console.print(f"[yellow]No instrument found for '{ticker_in}'.[/yellow]")
-                    continue
+                    # Ticker not in DB yet — offer to create it on the spot
+                    console.print(f"[yellow]'{ticker_in}' not in instruments table.[/yellow]")
+                    create_now = typer.confirm(f"  Create new instrument for {ticker_in}?", default=True)
+                    if not create_now:
+                        continue
+                    name_in = typer.prompt("  Name (Enter to use ticker as name)", default=ticker_in).strip() or ticker_in
+                    itype = typer.prompt("  Type (stock/etf/mutual_fund/cash/unclassified)", default="etf").strip()
+                    itype = itype if itype in ("stock", "etf", "mutual_fund", "cash") else "unclassified"
+                    asset_class = infer_asset_class(itype, name_in)
+                    found = Instrument(
+                        ticker=ticker_in,
+                        name=name_in,
+                        instrument_type=itype,
+                        asset_class=asset_class,
+                        sleeve="unclassified",
+                        is_cash_equivalent=False,
+                        needs_unwind=needs_unwind_flag(itype),
+                        aliases=[],
+                        bundle_tags=[],
+                    )
+                    session.add(found)
+                    session.flush()
                 resolved_inst = found
 
             elif choice == "c":
-                ticker_in = typer.prompt("  Ticker (leave blank for name-only)").strip() or None
+                ticker_in = typer.prompt("  Ticker (Enter to skip)").strip().upper() or None
                 name_in = typer.prompt("  Name").strip() or None
                 itype = typer.prompt("  Type (stock/etf/mutual_fund/cash/unclassified)", default="unclassified").strip()
                 itype = itype if itype in ("stock", "etf", "mutual_fund", "cash") else "unclassified"

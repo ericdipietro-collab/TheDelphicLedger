@@ -20,8 +20,9 @@ def persist_import(result: ImportResult, session: Session) -> ImportBatch:
     Raises ValueError if the file_hash already exists (no-op duplicate).
     """
     existing = session.query(ImportBatch).filter_by(file_hash=result.file_hash).first()
-    if existing is not None:
+    if existing is not None and existing.row_count > 0:
         raise ValueError(f"Duplicate file: hash {result.file_hash[:16]}… already imported")
+    # existing with row_count == 0 was a void/failed import — allow re-import
 
     batch = ImportBatch(
         file_hash=result.file_hash,

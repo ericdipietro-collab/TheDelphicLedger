@@ -23,7 +23,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from committee.core.types import OracleOutput, ScenarioContext, TradeProposal
-from committee.models import Account, Holding, Instrument
+from committee.models import Account, Holding, Instrument, MarketObservation, UniverseEntry
 from committee.rebalancer.profiles import ConstraintProfile
 
 _DRIFT_ABS = Decimal("0.05")   # 5% absolute
@@ -109,6 +109,34 @@ def propose(
 
     if total_mv == 0:
         return []
+
+    # Load universe instruments (buy candidates not currently held)
+    universe_iids: list[int] = session.execute(
+        select(UniverseEntry.instrument_id)
+    ).scalars().all()
+
+    for iid in universe_iids:
+        if iid in instruments:
+            continue
+        inst = session.get(Instrument, iid)
+        if inst is not None:
+            instruments[iid] = inst
+
+    # Fetch latest prices for universe instruments from MarketObservation
+    for iid in universe_iids:
+        if iid in latest_price:
+            continue
+        obs = session.execute(
+            select(MarketObservation)
+            .where(
+                MarketObservation.instrument_id == iid,
+                MarketObservation.unit == "USD_adj_close",
+            )
+            .order_by(MarketObservation.observed_date.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+        if obs is not None:
+            latest_price[iid] = obs.value
 
     # Current sleeve weights (household level)
     sleeve_mv: dict[str, Decimal] = {}
@@ -209,11 +237,22 @@ def propose(
     new_positions = 0
 
     for sleeve in under_target:
-        sleeve_holdings = [
+        # Include currently-held instruments in this sleeve
+        held_candidates: list[tuple[int, Decimal]] = [
             (iid, mv)
             for iid, mv in household.items()
             if (instruments.get(iid) and (instruments[iid].sleeve or "other") == sleeve)
         ]
+        # Also include universe instruments in this sleeve not already held
+        universe_candidates: list[tuple[int, Decimal]] = [
+            (iid, Decimal("0"))
+            for iid in universe_iids
+            if iid not in household
+            and instruments.get(iid)
+            and (instruments[iid].sleeve or "other") == sleeve
+            and iid in latest_price
+        ]
+        sleeve_holdings = held_candidates + universe_candidates
         # Sort by score descending (best first), iid as tiebreaker for determinism
         sleeve_holdings.sort(
             key=lambda x: (-(scores.get(x[0]) and scores[x[0]].score or 0.0), x[0])

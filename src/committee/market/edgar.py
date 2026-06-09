@@ -92,6 +92,7 @@ _METRIC_CONCEPTS: dict[str, list[str]] = {
         "PaymentsToAcquireProductiveAssets",
     ],
     "dividends_paid": ["Dividends", "DividendsPaidCommonStockCash", "PaymentsOfDividends"],
+    "gross_profit": ["GrossProfit"],
 }
 
 
@@ -195,4 +196,45 @@ def _parse_8k_flags(data: dict) -> list[EightKFlag]:
             code = code.strip()
             if code in _TRACKED_8K_ITEMS:
                 results.append(EightKFlag(item_code=code, filing_date=filing_date))
+    return results
+
+
+# ── High-level batch fetch ────────────────────────────────────────────────────
+
+@dataclass
+class EdgarResult:
+    ticker: str
+    instrument_id: int
+    obs: list[FundamentalObs]
+    error: str | None = None
+
+
+def fetch_edgar_for_ticker(ticker: str, instrument_id: int) -> EdgarResult:
+    """Fetch annual fundamentals for one ticker. Returns EdgarResult (error is set on failure)."""
+    cik = lookup_cik(ticker)
+    if cik is None:
+        return EdgarResult(ticker=ticker, instrument_id=instrument_id, obs=[], error="no_cik")
+    try:
+        obs = fetch_companyfacts(cik)
+        return EdgarResult(ticker=ticker, instrument_id=instrument_id, obs=obs)
+    except Exception as e:
+        return EdgarResult(ticker=ticker, instrument_id=instrument_id, obs=[], error=str(e))
+
+
+def fetch_all_edgar(instruments: list[tuple[str, int]]) -> list[EdgarResult]:
+    """Fetch EDGAR fundamentals for a list of (ticker, instrument_id) pairs.
+
+    Uses a small thread pool — SEC courtesy limit is ~10 req/s and _edgar_wait()
+    enforces the inter-request gap, so concurrency is bounded to 3 workers.
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    results: list[EdgarResult] = []
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        futures = {
+            pool.submit(fetch_edgar_for_ticker, ticker, iid): (ticker, iid)
+            for ticker, iid in instruments
+        }
+        for fut in as_completed(futures):
+            results.append(fut.result())
     return results
