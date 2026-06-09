@@ -594,3 +594,43 @@ def test_correction_does_not_change_holdings_qty(db_session):
         if h.qty is not None
     }
     assert qty_before == qty_after
+
+
+def test_corrections_module_has_no_delete_calls():
+    """Immutability invariant: corrections.py must never call session.delete()."""
+    import ast
+    import pathlib
+    src = pathlib.Path("src/committee/lots/corrections.py").read_text()
+    tree = ast.parse(src)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Attribute) and node.attr == "delete":
+            raise AssertionError(
+                f"session.delete() call found at line {node.lineno} — corrections.py must be append-only"
+            )
+
+
+def test_validate_correction_detects_qty_conflict(db_session):
+    """validate_correction returns a CorrectionConflict when correction qty > holding qty."""
+    from sqlalchemy import select as sa_select
+
+    from committee.models import Holding
+
+    inst = _inst(db_session, "CORR5")
+
+    # Insert a small holding
+    holding = Holding(instrument_id=inst.id, qty=Decimal("10.0000"), as_of=date(2024, 1, 1))
+    db_session.add(holding)
+    db_session.flush()
+
+    # Correction with qty larger than holding — should conflict
+    corr = add_correction(
+        db_session, "ACCT-CONFLICT", inst.id,
+        date(2022, 1, 10), Decimal("999.0000"), Decimal("50.0000"),
+        "user_asserted", date(2024, 1, 1), "conflict test",
+    )
+    db_session.flush()
+
+    conflicts = validate_correction(db_session, corr)
+    assert len(conflicts) == 1
+    assert conflicts[0].conflict_reason == "correction_qty_exceeds_current_holding"
+    assert conflicts[0].broker_qty == Decimal("10.0000")

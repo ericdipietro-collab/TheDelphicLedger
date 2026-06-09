@@ -89,6 +89,7 @@ def derive_lots(session: Session, fallback_date: date | None = None) -> int:
                         qty=qty,
                         cost_per_share=cost_per_share,
                         basis_quality="exact",
+                        origin="broker_derived",
                     )
                 )
                 total += 1
@@ -137,6 +138,7 @@ def derive_lots(session: Session, fallback_date: date | None = None) -> int:
                     qty=snap.qty,
                     cost_per_share=cost_per_share,
                     basis_quality="average_fallback",
+                    origin="snapshot_fallback",
                 )
             )
             total += 1
