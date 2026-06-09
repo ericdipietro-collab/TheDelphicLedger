@@ -4,7 +4,7 @@ import {
   AlertTriangle, RefreshCw, TrendingUp, BarChart2, FileText, Tag, Boxes, Info,
   CheckCircle2, Circle, ArrowRight,
 } from 'lucide-react'
-import { api, BundleInfo, OracleCard, ChamberResponse, DissentRow, RivalObjection, SetupStatus } from '../api'
+import { api, BundleInfo, OracleCard, ChamberResponse, DissentRow, RivalObjection, SetupStatus, RunSummary } from '../api'
 import { ORACLE_IDS, ORACLE_COLOR, ORACLE_DISPLAY, fmtScore, fmtPct, scoreColor, DIRECTION_COLOR } from '../constants'
 
 function daysAgo(isoDate: string): string {
@@ -716,6 +716,7 @@ export function Chamber() {
   const [bundles, setBundles] = useState<BundleInfo[]>([])
   const [bundleToggling, setBundleToggling] = useState<string | null>(null)
   const [setupStatus, setSetupStatus] = useState<SetupStatus | null>(null)
+  const [runs, setRuns] = useState<RunSummary[]>([])
 
   const refreshSetupStatus = () => api.getSetupStatus().then(setSetupStatus).catch(() => {})
 
@@ -726,6 +727,7 @@ export function Chamber() {
       if (cfg.available_profiles.length > 0) setProfiles(cfg.available_profiles)
     }).catch(() => {})
     api.getBundles().then(setBundles).catch(() => {})
+    api.listRuns().then(setRuns).catch(() => {})
     refreshSetupStatus()
   }, [])
 
@@ -811,10 +813,37 @@ export function Chamber() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-semibold text-white">The Chamber</h1>
-          <p className="text-sm text-slate-500 mt-1 font-mono">
-            run {data.run_id.slice(0, 8)}… &middot; {new Date(data.run_at).toLocaleString()}
-            {data.scenario_id && <span className="ml-2 text-violet-400">scenario: {data.scenario_id}</span>}
-          </p>
+          {runs.length > 1 ? (
+            <select
+              value={data.run_id}
+              onChange={async e => {
+                const runId = e.target.value
+                setLoading(true)
+                setError(null)
+                try {
+                  const result = await api.getChamber(runId)
+                  setData(result)
+                } catch (err) {
+                  setError(String(err))
+                } finally {
+                  setLoading(false)
+                }
+              }}
+              className="mt-1 bg-slate-900 border border-slate-700 text-slate-400 text-xs rounded-lg px-2.5 py-1.5 font-mono focus:outline-none"
+            >
+              {runs.map(r => (
+                <option key={r.run_id} value={r.run_id}>
+                  {r.run_id.slice(0, 8)} · {new Date(r.run_at).toLocaleDateString()}
+                  {r.proposal_count > 0 ? ` (${r.proposal_count} proposals)` : ''}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <p className="text-sm text-slate-500 mt-1 font-mono">
+              run {data.run_id.slice(0, 8)}… &middot; {new Date(data.run_at).toLocaleString()}
+              {data.scenario_id && <span className="ml-2 text-violet-400">scenario: {data.scenario_id}</span>}
+            </p>
+          )}
           {setupStatus && (setupStatus.prices_as_of || setupStatus.edgar_as_of) && (
             <p className="text-xs text-slate-600 font-mono mt-0.5">
               {setupStatus.prices_as_of && (
