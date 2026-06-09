@@ -194,49 +194,49 @@ def fetch_prices(session: SessionDep) -> RefreshResult:
     )
 
     to_fetch = [i for i in all_insts if i.ticker and i.id not in fresh_iids]
+    skipped = sum(1 for i in all_insts if i.ticker and i.id in fresh_iids)
 
     with _progress_lock:
         _fetch_progress.update({"operation": "prices", "current": 0, "total": len(to_fetch)})
 
     total = 0
-    skipped = 0
-    fetched_n = 0
     errors: list[str] = []
     unavailable: list[str] = []
-    for inst in all_insts:
-        if not inst.ticker:
-            continue
-        if inst.id in fresh_iids:
-            skipped += 1
-            continue
-        fetched_n += 1
-        with _progress_lock:
-            _fetch_progress["current"] = fetched_n
-        try:
-            obs = adapter.fetch_eod(inst.ticker, start, end)
+
+    if to_fetch:
+        # Batch-fetch all stale tickers in parallel, then save sequentially.
+        # Progress counter reflects save progress (network is parallel / opaque).
+        ticker_to_inst = {i.ticker: i for i in to_fetch if i.ticker}
+        batch = adapter.fetch_eod_batch(
+            list(ticker_to_inst.keys()), start, end
+        )
+
+        for saved_n, (ticker, result) in enumerate(batch.items(), start=1):
+            with _progress_lock:
+                _fetch_progress["current"] = saved_n
+            inst = ticker_to_inst[ticker]
+            if isinstance(result, Exception):
+                msg_lower = str(result).lower()
+                if any(k in msg_lower for k in ("404", "not found", "no data", "delisted", "no timezone")):
+                    unavailable.append(ticker)
+                else:
+                    errors.append(f"{ticker}: {result}")
+                continue
             n = save_price_observations(
                 session=session,
                 source=adapter.source_name,
-                ticker=inst.ticker,
+                ticker=ticker,
                 instrument_id=inst.id,
-                obs_list=[(o.observed_date, o.adj_close, o.dividend) for o in obs],
+                obs_list=[(o.observed_date, o.adj_close, o.dividend) for o in result],
             )
             total += n
-        except Exception as e:
-            msg_lower = str(e).lower()
-            # 404 / "not found" / "no data" = price unavailable for this ticker, not a system error
-            if any(k in msg_lower for k in ("404", "not found", "no data", "delisted", "no timezone")):
-                unavailable.append(inst.ticker)
-            else:
-                errors.append(f"{inst.ticker}: {e}")
 
     with _progress_lock:
         _fetch_progress.update({"operation": None, "current": 0, "total": 0})
 
     session.commit()
 
-    fetched_count = len(all_insts) - skipped
-    parts: list[str] = [f"Fetched {total} new observations for {fetched_count} instruments; {skipped} already fresh (skipped)."]
+    parts: list[str] = [f"Fetched {total} new observations for {len(to_fetch)} instruments; {skipped} already fresh (skipped)."]
     if unavailable:
         parts.append(f"No price data: {', '.join(unavailable)} (OTC/preferred/delisted — normal).")
     if errors:
