@@ -4,6 +4,10 @@
 
 # The Delphic Ledger
 
+[![CI](https://github.com/ericdipietro-collab/TheDelphicLedger/actions/workflows/ci.yml/badge.svg)](https://github.com/ericdipietro-collab/TheDelphicLedger/actions/workflows/ci.yml)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 > *"Know thy holdings."* — after the inscription at the Temple of Apollo at Delphi
 
 **Six oracles. Zero consensus. No predictions.**
@@ -17,13 +21,16 @@ A local portfolio analysis engine and engineering showcase. Import real broker e
 ## Screenshots
 
 ![The Chamber](docs/screenshots/dashboard-chamber.png)
-*The Chamber — six oracle verdicts, regime state, and the control panel for data refresh and convening.*
+*The Chamber — six oracle verdicts, regime state, and the control panel for universe, data refresh, and convening.*
 
 ![Portfolio](docs/screenshots/dashboard-portfolio.png)
 *Portfolio — allocation breakdown with per-oracle scores and drift-vs-target chart.*
 
 ![Trades](docs/screenshots/dashboard-trades.png)
-*Trades — rebalancing proposals per oracle with direction, quantity, estimated value, and score.*
+*Trades — rebalancing proposals per oracle with direction, quantity, estimated value, and score. Export to Fidelity or Schwab batch CSV.*
+
+![Scenarios](docs/screenshots/dashboard-scenarios.png)
+*Scenario Theater — stress-test the portfolio against historical crashes and hypothetical shocks.*
 
 ---
 
@@ -220,7 +227,7 @@ cd dashboard && npm install && npm run dev
 | Package manager | uv |
 | ORM / DB | SQLAlchemy + SQLite (Postgres-ready via connection string) |
 | CLI | Typer + Rich |
-| Tests | pytest (289 tests) |
+| Tests | pytest (330 tests) |
 | Linter | ruff |
 | Type checking | mypy strict on `core/`, `oracles/`, `rebalancer/`, `signals/` |
 | Dashboard API | FastAPI (local-only, binds 127.0.0.1) |
@@ -249,7 +256,7 @@ See `CLAUDE.md` for the full invariant set and `docs/delphic-ledger-design.md` f
 ## Running tests
 
 ```bash
-uv run pytest          # 289 tests
+uv run pytest          # 330 tests
 uv run ruff check .
 uv run mypy src/committee/core src/committee/oracles src/committee/rebalancer src/committee/signals
 ```
@@ -267,7 +274,7 @@ uv run mypy src/committee/core src/committee/oracles src/committee/rebalancer sr
 | M5 — Scenario packs | Complete |
 | M6 — Tax lots, unwind queue | Complete |
 | M7 — Dashboard (FastAPI + React) | Complete |
-| M8 — Backtest, README, demo | In progress |
+| M8 — Backtest, README, demo | Complete |
 
 ---
 

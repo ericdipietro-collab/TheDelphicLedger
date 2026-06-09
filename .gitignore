@@ -1,14 +1,14 @@
 # Real portfolio data — never commit
 data/
 
-# Python
+# Python build artifacts
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 .Python
 *.egg-info/
-dist/
+/dist/
 build/
 .eggs/
 
@@ -26,9 +26,9 @@ venv/
 htmlcov/
 .coverage
 
-# Node / Vite (dashboard)
+# Node / Vite (dashboard source deps)
 node_modules/
-dist/
+dashboard/node_modules/
 .vite/
 
 # SQLite dev databases
@@ -49,9 +49,6 @@ watchlists.yaml
 profiles/watchlist*.yaml
 data/watchlist*.yaml
 
-# Dashboard build artifacts (not source)
-dashboard/dist/
-
 # Runtime logs and browser automation artifacts
 logs/
 .playwright-mcp/
@@ -62,6 +59,12 @@ logs/
 *.jpeg
 *.gif
 *.webp
-# Keep README screenshots committed
+# Keep README screenshots and logo committed
 !docs/screenshots/*.png
+!docs/logo.svg
+
+# Internal development artifacts
+plans/
+docs/superpowers/
 .worktrees/
+.remember/
