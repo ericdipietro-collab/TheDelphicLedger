@@ -162,6 +162,39 @@ class TaxLot(Base):
     qty: Mapped[Decimal] = mapped_column(DecimalText, nullable=False)
     cost_per_share: Mapped[Decimal] = mapped_column(DecimalText, nullable=False)
     basis_quality: Mapped[str] = mapped_column(Text, nullable=False)  # "exact" | "average_fallback"
+    origin: Mapped[str | None] = mapped_column(
+        Text, nullable=True, default="broker_derived"
+    )  # "broker_derived" | "snapshot_fallback" | "user_asserted" | "user_corrected"
+
+
+class LotCorrection(Base):
+    """Append-only tax-lot correction. Never mutate or delete rows.
+
+    User corrections override broker-derived lots in derive_lots() (FR-4.7).
+    validation_status: "active" | "conflicted" | "superseded" | "invalid"
+    """
+
+    __tablename__ = "lot_corrections"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    supersedes_id: Mapped[int | None] = mapped_column(
+        ForeignKey("lot_corrections.id"), nullable=True
+    )
+    account_key: Mapped[str] = mapped_column(Text, nullable=False)
+    instrument_id: Mapped[int] = mapped_column(ForeignKey("instruments.id"), nullable=False)
+    acquired_date: Mapped[date] = mapped_column(Date, nullable=False)
+    qty: Mapped[Decimal] = mapped_column(DecimalText, nullable=False)
+    cost_per_share: Mapped[Decimal] = mapped_column(DecimalText, nullable=False)
+    basis_quality: Mapped[str] = mapped_column(Text, nullable=False)  # "user_asserted" | "user_corrected"
+    effective_date: Mapped[date] = mapped_column(Date, nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    validation_status: Mapped[str] = mapped_column(Text, nullable=False, default="active")
+    currency: Mapped[str] = mapped_column(Text, nullable=False, default="USD")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
+
+    instrument: Mapped[Instrument] = relationship()
 
 
 class Holding(Base):

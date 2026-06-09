@@ -12,8 +12,10 @@ from rich.table import Table
 app = typer.Typer(name="committee", add_completion=False)
 universe_app = typer.Typer(name="universe", help="Manage the instrument universe (bundles).")
 recon_app = typer.Typer(name="recon", help="Quantity reconciliation (run, list, show, resolve).")
+lots_app = typer.Typer(name="lots", help="Tax-lot correction workflow.")
 app.add_typer(universe_app, name="universe")
 app.add_typer(recon_app, name="recon")
+app.add_typer(lots_app, name="lots")
 console = Console()
 
 _DB_PATH_OPT = typer.Option(Path("data/ledger.db"), "--db", help="SQLite database path")
@@ -2143,6 +2145,127 @@ def serve(
         port=port,
         log_level="warning",
     )
+
+
+@lots_app.command("add")
+def lots_add(
+    account: str = typer.Argument(..., help="Account key"),
+    ticker: str = typer.Argument(..., help="Ticker symbol"),
+    acquired: str = typer.Argument(..., help="Acquired date YYYY-MM-DD"),
+    qty: str = typer.Argument(..., help="Quantity as decimal string"),
+    cost: str = typer.Argument(..., help="Cost per share as decimal string"),
+    reason: str = typer.Argument(..., help="Reason for correction"),
+    db: Path = _DB_PATH_OPT,
+) -> None:
+    """Add a tax-lot correction."""
+    import contextlib
+    from datetime import date as date_type
+    from decimal import Decimal, InvalidOperation
+
+    from sqlalchemy import select as sa_select
+    from sqlalchemy.orm import Session as _Session
+
+    from committee.db import get_session, init_db
+    from committee.lots.corrections import add_correction, validate_correction
+    from committee.models import Instrument
+
+    try:
+        acq_date = date_type.fromisoformat(acquired)
+        qty_d = Decimal(qty)
+        cost_d = Decimal(cost)
+    except (ValueError, InvalidOperation) as exc:
+        console.print(f"[red]Invalid argument: {exc}[/red]")
+        raise typer.Exit(1) from None
+
+    init_db(db)
+    gen = get_session()
+    session = next(gen)
+    if not isinstance(session, _Session):
+        raise RuntimeError("get_session() did not yield a Session")
+    try:
+        inst = session.execute(
+            sa_select(Instrument).where(Instrument.ticker == ticker)
+        ).scalar_one_or_none()
+        if inst is None:
+            console.print(f"[red]Instrument {ticker!r} not found.[/red]")
+            raise typer.Exit(1)
+
+        corr = add_correction(
+            session, account, inst.id, acq_date, qty_d, cost_d,
+            "user_asserted", date_type.today(), reason,
+        )
+        session.flush()
+        conflicts = validate_correction(session, corr)
+        if conflicts:
+            for c in conflicts:
+                console.print(f"[yellow]Warning: {c.conflict_reason}[/yellow]")
+            corr.validation_status = "conflicted"
+        session.commit()
+        console.print(f"[green]Correction added (id={corr.id}, status={corr.validation_status})[/green]")
+    except SystemExit:
+        raise
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        with contextlib.suppress(StopIteration):
+            next(gen)
+
+
+@lots_app.command("list")
+def lots_list(
+    db: Path = _DB_PATH_OPT,
+    ticker: str | None = typer.Option(None, "--ticker"),
+) -> None:
+    """List active lot corrections."""
+    import contextlib
+
+    from sqlalchemy.orm import Session as _Session
+
+    from committee.db import get_session, init_db
+    from committee.lots.corrections import get_active_corrections
+    from committee.models import Instrument
+
+    init_db(db)
+    gen = get_session()
+    session = next(gen)
+    if not isinstance(session, _Session):
+        raise RuntimeError("get_session() did not yield a Session")
+    try:
+        corrs = get_active_corrections(session)
+        if not corrs:
+            console.print("No active corrections.")
+            return
+        table = Table(title="Active Lot Corrections")
+        table.add_column("ID")
+        table.add_column("Account")
+        table.add_column("Ticker")
+        table.add_column("Acquired")
+        table.add_column("Qty")
+        table.add_column("Cost/Share")
+        table.add_column("Status")
+        for c in corrs:
+            inst = session.get(Instrument, c.instrument_id)
+            if ticker and (inst is None or inst.ticker != ticker):
+                continue
+            table.add_row(
+                str(c.id),
+                c.account_key,
+                inst.ticker if inst else "?",
+                str(c.acquired_date),
+                str(c.qty),
+                str(c.cost_per_share),
+                c.validation_status,
+            )
+        console.print(table)
+    except SystemExit:
+        raise
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        with contextlib.suppress(StopIteration):
+            next(gen)
 
 
 if __name__ == "__main__":
