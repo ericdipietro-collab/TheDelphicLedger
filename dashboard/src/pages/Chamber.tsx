@@ -717,6 +717,7 @@ export function Chamber() {
   const [bundleToggling, setBundleToggling] = useState<string | null>(null)
   const [setupStatus, setSetupStatus] = useState<SetupStatus | null>(null)
   const [runs, setRuns] = useState<RunSummary[]>([])
+  const [fetchProgressData, setFetchProgressData] = useState<{ current: number; total: number } | null>(null)
 
   const refreshSetupStatus = () => api.getSetupStatus().then(setSetupStatus).catch(() => {})
 
@@ -730,6 +731,24 @@ export function Chamber() {
     api.listRuns().then(setRuns).catch(() => {})
     refreshSetupStatus()
   }, [])
+
+  useEffect(() => {
+    if (dataOp !== 'prices') {
+      setFetchProgressData(null)
+      return
+    }
+    const interval = setInterval(async () => {
+      try {
+        const prog = await api.fetchProgress()
+        if (prog.operation === 'prices' && prog.total > 0) {
+          setFetchProgressData({ current: prog.current, total: prog.total })
+        }
+      } catch {
+        // progress is best-effort
+      }
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [dataOp])
 
   const handleBundleToggle = async (id: string, enabled: boolean) => {
     setBundleToggling(id)
@@ -878,7 +897,11 @@ export function Chamber() {
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700 disabled:opacity-40"
           >
             <TrendingUp size={13} className={dataOp === 'prices' ? 'animate-pulse' : ''} />
-            {dataOp === 'prices' ? 'Fetching…' : 'Fetch prices'}
+            {dataOp === 'prices'
+              ? (fetchProgressData && fetchProgressData.total > 0
+                ? `Fetching… ${fetchProgressData.current} / ${fetchProgressData.total}`
+                : 'Fetching…')
+              : 'Fetch prices'}
           </button>
           <button
             onClick={() => handleDataOp('macro')}
