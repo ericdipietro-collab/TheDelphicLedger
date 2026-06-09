@@ -13,7 +13,7 @@ from sqlalchemy.orm.attributes import flag_modified
 from committee.ingest.importer import process_file
 from committee.ingest.template import load_named_template
 from committee.models import BundleState, Instrument
-from committee.universe.bundle import BundleConfig
+from committee.universe.bundle import BundleConfig, TickerEntry
 from committee.universe.guard import _DEFAULT_CAP, check_guard
 
 
@@ -61,25 +61,27 @@ def refresh_bundle(
     Returns (instrument_count_tagged, error_message | None).
     """
     if bundle.source in ("explicit", "mixed"):
-        tickers = [e.ticker for e in bundle.tickers]
+        entries = bundle.tickers
     elif bundle.source == "index_proxy":
         try:
-            tickers = _fetch_index_tickers(bundle, profiles_dir, http_get)
+            raw = _fetch_index_tickers(bundle, profiles_dir, http_get)
         except Exception as exc:
             error = str(exc)
             state = _get_or_create_state(session, bundle.id)
             state.last_error = error
             session.flush()
             return 0, error
+        entries = [TickerEntry(ticker=t, sleeve=bundle.sleeve_default) for t in raw]
     else:
         return 0, f"Unknown source type: {bundle.source!r}"
 
     count = 0
-    for ticker in tickers:
-        ticker = ticker.strip() if ticker else ""
+    for entry in entries:
+        ticker = (entry.ticker or "").strip()
         if not ticker:
             continue
-        inst = _resolve_or_create(session, ticker)
+        sleeve_override = entry.sleeve or bundle.sleeve_default
+        inst = _resolve_or_create(session, ticker, sleeve_override)
         if bundle.id not in (inst.bundle_tags or []):
             tags = list(inst.bundle_tags or [])
             tags.append(bundle.id)
@@ -111,19 +113,25 @@ def _get_or_create_state(session: Session, bundle_id: str) -> BundleState:
     return state
 
 
-def _resolve_or_create(session: Session, ticker: str) -> Instrument:
-    """Find an instrument by exact ticker, or create a bare record if absent."""
+def _resolve_or_create(session: Session, ticker: str, sleeve_override: str | None = None) -> Instrument:
+    """Find an instrument by exact ticker, or create a bare record if absent.
+
+    If sleeve_override is given and the instrument is still unclassified, apply it.
+    Already-classified instruments are never modified.
+    """
     inst = session.execute(
         select(Instrument).where(Instrument.ticker == ticker)
     ).scalar_one_or_none()
     if inst is not None:
+        if sleeve_override and inst.sleeve in ("unclassified", None):
+            inst.sleeve = sleeve_override
         return inst
     inst = Instrument(
         ticker=ticker,
         name=None,
         instrument_type="unclassified",
         asset_class="unclassified",
-        sleeve="unclassified",
+        sleeve=sleeve_override or "unclassified",
         is_cash_equivalent=False,
         needs_unwind=False,
         aliases=[],

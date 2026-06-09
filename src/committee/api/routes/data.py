@@ -395,9 +395,43 @@ _TICKER_OVERRIDES: dict[str, tuple[str, str, str]] = {
     "SGOV": ("etf", "fixed_income", "fixed_income"),
     "VGIT": ("etf", "fixed_income", "fixed_income"),
     "TLT":  ("etf", "fixed_income", "fixed_income"),
-    # International stocks (F-suffix OTC or known foreign)
-    "BPZZF":("stock", "equity", "equity_intl"),
-    "RIO":  ("stock", "equity", "equity_intl"),
+    # International stocks — exchange-listed ADRs and direct listings
+    "ASML": ("stock", "equity", "equity_intl"),  # Netherlands
+    "NVS":  ("stock", "equity", "equity_intl"),  # Switzerland
+    "ABB":  ("stock", "equity", "equity_intl"),  # Switzerland
+    "AZN":  ("stock", "equity", "equity_intl"),  # UK/Sweden
+    "GSK":  ("stock", "equity", "equity_intl"),  # UK
+    "UL":   ("stock", "equity", "equity_intl"),  # UK/Netherlands
+    "BTI":  ("stock", "equity", "equity_intl"),  # UK
+    "DEO":  ("stock", "equity", "equity_intl"),  # UK
+    "BP":   ("stock", "equity", "equity_intl"),  # UK
+    "SHEL": ("stock", "equity", "equity_intl"),  # UK/Netherlands
+    "BCS":  ("stock", "equity", "equity_intl"),  # UK
+    "HSBC": ("stock", "equity", "equity_intl"),  # UK/HK
+    "SAP":  ("stock", "equity", "equity_intl"),  # Germany
+    "ING":  ("stock", "equity", "equity_intl"),  # Netherlands
+    "SAN":  ("stock", "equity", "equity_intl"),  # Spain
+    "TTE":  ("stock", "equity", "equity_intl"),  # France
+    "E":    ("stock", "equity", "equity_intl"),  # Italy
+    "TSM":  ("stock", "equity", "equity_intl"),  # Taiwan
+    "TM":   ("stock", "equity", "equity_intl"),  # Japan
+    "SONY": ("stock", "equity", "equity_intl"),  # Japan
+    "HMC":  ("stock", "equity", "equity_intl"),  # Japan
+    "MFG":  ("stock", "equity", "equity_intl"),  # Japan
+    "BHP":  ("stock", "equity", "equity_intl"),  # Australia
+    "RIO":  ("stock", "equity", "equity_intl"),  # Australia/UK
+    "TD":   ("stock", "equity", "equity_intl"),  # Canada
+    "RY":   ("stock", "equity", "equity_intl"),  # Canada
+    "ENB":  ("stock", "equity", "equity_intl"),  # Canada
+    "BAM":  ("stock", "equity", "equity_intl"),  # Canada
+    "CNI":  ("stock", "equity", "equity_intl"),  # Canada
+    "CP":   ("stock", "equity", "equity_intl"),  # Canada
+    "HDB":  ("stock", "equity", "equity_intl"),  # India
+    "IBN":  ("stock", "equity", "equity_intl"),  # India
+    "INFY": ("stock", "equity", "equity_intl"),  # India
+    "WIT":  ("stock", "equity", "equity_intl"),  # India
+    # International stocks — OTC F-suffix (also caught by heuristic)
+    "BPZZF":("stock", "equity", "equity_intl"),  # Canada
 }
 
 # OTC foreign tickers end in F (e.g. BPZZF, NESOF, RYDAF)

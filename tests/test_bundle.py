@@ -61,7 +61,7 @@ def test_load_all_bundles() -> None:
 
     configs = load_bundle_configs(BUNDLES_DIR)
     ids = {c.id for c in configs}
-    assert {"etf_core", "sp500", "dow30", "nasdaq100", "russell2000", "watchlist"}.issubset(ids)
+    assert {"etf_core", "sp500", "dow30", "nasdaq100", "russell2000", "watchlist", "intl_large_cap"}.issubset(ids)
 
 
 def test_ticker_entry_plain_string(tmp_path: Path) -> None:
@@ -230,6 +230,78 @@ def test_refresh_index_proxy_bundle(db_session: Session) -> None:
 
     for inst in instruments:
         assert "sp500_test" in (inst.bundle_tags or [])
+
+
+def test_refresh_bundle_applies_sleeve_default(db_session: Session, tmp_path: Path) -> None:
+    """sleeve_default on the bundle config is applied to newly-created instruments."""
+    from sqlalchemy import select
+
+    from committee.models import Instrument
+    from committee.universe.bundle import BundleConfig, TickerEntry
+    from committee.universe.manager import refresh_bundle
+
+    bundle = BundleConfig(
+        id="intl_test",
+        description="Test",
+        source="explicit",
+        sleeve_default="equity_intl",
+        tickers=[TickerEntry(ticker="ASML")],
+    )
+    refresh_bundle(db_session, bundle, tmp_path)
+    inst = db_session.execute(select(Instrument).where(Instrument.ticker == "ASML")).scalar_one()
+    assert inst.sleeve == "equity_intl"
+
+
+def test_refresh_bundle_per_ticker_sleeve_overrides_default(db_session: Session, tmp_path: Path) -> None:
+    """Per-ticker sleeve takes precedence over sleeve_default."""
+    from sqlalchemy import select
+
+    from committee.models import Instrument
+    from committee.universe.bundle import BundleConfig, TickerEntry
+    from committee.universe.manager import refresh_bundle
+
+    bundle = BundleConfig(
+        id="intl_test2",
+        description="Test",
+        source="explicit",
+        sleeve_default="equity_intl",
+        tickers=[
+            TickerEntry(ticker="TSM", sleeve="equity_intl"),
+            TickerEntry(ticker="NVS"),  # falls back to sleeve_default
+        ],
+    )
+    refresh_bundle(db_session, bundle, tmp_path)
+    for ticker in ("TSM", "NVS"):
+        inst = db_session.execute(select(Instrument).where(Instrument.ticker == ticker)).scalar_one()
+        assert inst.sleeve == "equity_intl", f"{ticker} sleeve wrong: {inst.sleeve}"
+
+
+def test_refresh_bundle_does_not_overwrite_classified_sleeve(db_session: Session, tmp_path: Path) -> None:
+    """Already-classified instruments keep their sleeve when the bundle has a different default."""
+    from sqlalchemy import select
+
+    from committee.models import Instrument
+    from committee.universe.bundle import BundleConfig, TickerEntry
+    from committee.universe.manager import refresh_bundle
+
+    existing = Instrument(
+        ticker="SHEL", name="Shell PLC", instrument_type="stock",
+        sleeve="equity_intl", asset_class="equity",
+        is_cash_equivalent=False, needs_unwind=True, aliases=[], bundle_tags=[],
+    )
+    db_session.add(existing)
+    db_session.flush()
+
+    bundle = BundleConfig(
+        id="intl_test3",
+        description="Test",
+        source="explicit",
+        sleeve_default="equity_us",  # wrong default — must not overwrite a classified instrument
+        tickers=[TickerEntry(ticker="SHEL")],
+    )
+    refresh_bundle(db_session, bundle, tmp_path)
+    inst = db_session.execute(select(Instrument).where(Instrument.ticker == "SHEL")).scalar_one()
+    assert inst.sleeve == "equity_intl"
 
 
 def test_refresh_index_proxy_missing_template(db_session: Session, tmp_path: Path) -> None:

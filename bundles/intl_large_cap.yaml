@@ -1,0 +1,84 @@
+id: intl_large_cap
+description: "~35 international large-cap stocks (ADRs and direct NYSE/NASDAQ listings) for equity_intl sleeve coverage"
+source: explicit
+refresh_policy: nightly
+sleeve_default: equity_intl
+enabled_default: false
+size_estimate: 35
+tickers:
+  # Europe — UK
+  - ticker: AZN
+    sleeve: equity_intl   # AstraZeneca PLC
+  - ticker: BP
+    sleeve: equity_intl   # BP PLC
+  - ticker: SHEL
+    sleeve: equity_intl   # Shell PLC
+  - ticker: GSK
+    sleeve: equity_intl   # GSK plc
+  - ticker: UL
+    sleeve: equity_intl   # Unilever PLC
+  - ticker: BTI
+    sleeve: equity_intl   # British American Tobacco
+  - ticker: DEO
+    sleeve: equity_intl   # Diageo PLC
+  - ticker: HSBC
+    sleeve: equity_intl   # HSBC Holdings PLC
+  - ticker: BCS
+    sleeve: equity_intl   # Barclays PLC
+  # Europe — Continental
+  - ticker: ASML
+    sleeve: equity_intl   # ASML Holding NV (Netherlands)
+  - ticker: ING
+    sleeve: equity_intl   # ING Groep NV (Netherlands)
+  - ticker: NVS
+    sleeve: equity_intl   # Novartis AG (Switzerland)
+  - ticker: ABB
+    sleeve: equity_intl   # ABB Ltd (Switzerland)
+  - ticker: SAP
+    sleeve: equity_intl   # SAP SE (Germany)
+  - ticker: SAN
+    sleeve: equity_intl   # Banco Santander SA (Spain)
+  - ticker: TTE
+    sleeve: equity_intl   # TotalEnergies SE (France)
+  - ticker: E
+    sleeve: equity_intl   # Eni SpA (Italy)
+  # Asia-Pacific — Japan
+  - ticker: TM
+    sleeve: equity_intl   # Toyota Motor Corp
+  - ticker: SONY
+    sleeve: equity_intl   # Sony Group Corp
+  - ticker: HMC
+    sleeve: equity_intl   # Honda Motor Co
+  - ticker: MFG
+    sleeve: equity_intl   # Mizuho Financial Group
+  # Asia-Pacific — Other
+  - ticker: TSM
+    sleeve: equity_intl   # Taiwan Semiconductor Mfg (TSMC)
+  - ticker: BHP
+    sleeve: equity_intl   # BHP Group Limited (Australia)
+  - ticker: RIO
+    sleeve: equity_intl   # Rio Tinto PLC (Australia/UK)
+  # Canada
+  - ticker: TD
+    sleeve: equity_intl   # Toronto-Dominion Bank
+  - ticker: RY
+    sleeve: equity_intl   # Royal Bank of Canada
+  - ticker: ENB
+    sleeve: equity_intl   # Enbridge Inc
+  - ticker: BAM
+    sleeve: equity_intl   # Brookfield Asset Management
+  - ticker: CNI
+    sleeve: equity_intl   # Canadian National Railway
+  - ticker: CP
+    sleeve: equity_intl   # Canadian Pacific Kansas City
+  - ticker: BPZZF
+    sleeve: equity_intl   # Boston Pizza Royalties (OTC)
+  # India
+  - ticker: HDB
+    sleeve: equity_intl   # HDFC Bank Ltd
+  - ticker: IBN
+    sleeve: equity_intl   # ICICI Bank Ltd
+  - ticker: INFY
+    sleeve: equity_intl   # Infosys Ltd
+  - ticker: WIT
+    sleeve: equity_intl   # Wipro Ltd
