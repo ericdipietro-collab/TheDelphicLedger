@@ -4,7 +4,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import Index, JSON, Date, DateTime, ForeignKey, Integer, Text, func
+from sqlalchemy import JSON, Date, DateTime, ForeignKey, Index, Integer, Text, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from committee.types import DecimalText
@@ -195,6 +195,54 @@ class LotCorrection(Base):
     )
 
     instrument: Mapped[Instrument] = relationship()
+
+
+class SleeveConfig(Base):
+    """Versioned custom sleeve configuration. Immutable once created."""
+
+    __tablename__ = "sleeve_configs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="active")  # active | inactive
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
+
+    definitions: Mapped[list[SleeveDefinition]] = relationship(back_populates="config")
+    assignments: Mapped[list[SleeveAssignment]] = relationship(back_populates="config")
+
+
+class SleeveDefinition(Base):
+    """One sleeve within a SleeveConfig."""
+
+    __tablename__ = "sleeve_definitions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    config_id: Mapped[int] = mapped_column(ForeignKey("sleeve_configs.id"), nullable=False)
+    sleeve_key: Mapped[str] = mapped_column(Text, nullable=False)
+    label: Mapped[str] = mapped_column(Text, nullable=False)
+    target_weight: Mapped[Decimal] = mapped_column(DecimalText, nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    config: Mapped[SleeveConfig] = relationship(back_populates="definitions")
+
+
+class SleeveAssignment(Base):
+    """Maps an instrument to exactly one sleeve in a SleeveConfig."""
+
+    __tablename__ = "sleeve_assignments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    config_id: Mapped[int] = mapped_column(ForeignKey("sleeve_configs.id"), nullable=False)
+    instrument_id: Mapped[int] = mapped_column(ForeignKey("instruments.id"), nullable=False)
+    sleeve_key: Mapped[str] = mapped_column(Text, nullable=False)
+
+    config: Mapped[SleeveConfig] = relationship(back_populates="assignments")
+    instrument: Mapped[Instrument] = relationship()
+
+    __table_args__ = (
+        Index("ix_sleeve_assign_config_instrument", "config_id", "instrument_id", unique=True),
+    )
 
 
 class Holding(Base):

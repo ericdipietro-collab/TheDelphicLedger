@@ -13,9 +13,11 @@ app = typer.Typer(name="committee", add_completion=False)
 universe_app = typer.Typer(name="universe", help="Manage the instrument universe (bundles).")
 recon_app = typer.Typer(name="recon", help="Quantity reconciliation (run, list, show, resolve).")
 lots_app = typer.Typer(name="lots", help="Tax-lot correction workflow.")
+sleeves_app = typer.Typer(name="sleeves", help="Custom sleeve configuration.")
 app.add_typer(universe_app, name="universe")
 app.add_typer(recon_app, name="recon")
 app.add_typer(lots_app, name="lots")
+app.add_typer(sleeves_app, name="sleeves")
 console = Console()
 
 _DB_PATH_OPT = typer.Option(Path("data/ledger.db"), "--db", help="SQLite database path")
@@ -2272,6 +2274,83 @@ def lots_list(
     except Exception:
         session.rollback()
         raise
+    finally:
+        with contextlib.suppress(StopIteration):
+            next(gen)
+
+
+@sleeves_app.command("create")
+def sleeves_create(
+    name: str = typer.Argument(..., help="Config name"),
+    spec: str = typer.Argument(..., help="JSON: [{key,label,weight},...] or path to JSON file"),
+    db: Path = _DB_PATH_OPT,
+) -> None:
+    """Create a new sleeve configuration (JSON spec)."""
+    import json
+
+    from committee.core.sleeves import SleeveValidationError, create_sleeve_config
+    from committee.db import get_session, init_db
+
+    try:
+        spec_data = json.loads(spec)
+    except (json.JSONDecodeError, ValueError):
+        # Try as file path
+        try:
+            spec_data = json.loads(Path(spec).read_text())
+        except Exception as exc:
+            console.print(f"[red]Cannot parse spec: {exc}[/red]")
+            raise typer.Exit(1) from None
+
+    sleeves_raw = spec_data if isinstance(spec_data, list) else spec_data.get("sleeves", [])
+    assignments_raw = spec_data.get("assignments", {}) if isinstance(spec_data, dict) else {}
+    assignments = {int(k): v for k, v in assignments_raw.items()}
+
+    init_db(db)
+    gen = get_session()
+    session = next(gen)
+    try:
+        config = create_sleeve_config(session, name, sleeves_raw, assignments)
+        session.commit()
+        console.print(f"[green]Created {name!r} version {config.version} (id={config.id})[/green]")
+    except SleeveValidationError as exc:
+        console.print(f"[red]Validation error: {exc}[/red]")
+        raise typer.Exit(1) from None
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        with contextlib.suppress(StopIteration):
+            next(gen)
+
+
+@sleeves_app.command("list")
+def sleeves_list(
+    db: Path = _DB_PATH_OPT,
+) -> None:
+    """List all sleeve configurations."""
+    from committee.core.sleeves import list_configs
+    from committee.db import get_session, init_db
+
+    init_db(db)
+    gen = get_session()
+    session = next(gen)
+    try:
+        configs = list_configs(session)
+        if not configs:
+            console.print("No sleeve configs found.")
+            return
+        table = Table(title="Sleeve Configurations")
+        table.add_column("ID")
+        table.add_column("Name")
+        table.add_column("Version")
+        table.add_column("Status")
+        table.add_column("Sleeves")
+        for c in configs:
+            sleeve_summary = ", ".join(
+                f"{d.sleeve_key}:{d.target_weight}" for d in sorted(c.definitions, key=lambda x: x.sort_order)
+            )
+            table.add_row(str(c.id), c.name, str(c.version), c.status, sleeve_summary)
+        console.print(table)
     finally:
         with contextlib.suppress(StopIteration):
             next(gen)
