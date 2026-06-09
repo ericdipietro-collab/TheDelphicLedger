@@ -23,9 +23,9 @@ from committee.api.deps import get_session
 from committee.ingest.importer import ImportResult, process_file
 from committee.ingest.persist import persist_import
 from committee.ingest.template import MappingTemplate, save_template
+from committee.models import PositionSnapshot
 from committee.resolver.cascade import resolve_instrument
 from committee.resolver.openfigi import live_figi_lookup
-from committee.models import PositionSnapshot
 
 router = APIRouter(prefix="/api/ingest", tags=["ingest"])
 SessionDep = Annotated[Session, Depends(get_session)]

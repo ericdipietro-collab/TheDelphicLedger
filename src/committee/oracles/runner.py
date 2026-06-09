@@ -250,7 +250,7 @@ def _run_macro_tactician(
         # Persist only the resolved tilt; confirmation is re-derived from obs at each call.
         db_state = load_state(session)
         db_state.tilt = regime_result.tilt
-        db_state.composite_score = comp_score  # type: ignore[assignment]
+        db_state.composite_score = comp_score
         db_state.last_run_at = datetime.now()
 
     # Pick sleeve targets based on active tilt

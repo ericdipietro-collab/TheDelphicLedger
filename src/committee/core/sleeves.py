@@ -20,7 +20,7 @@ class SleeveValidationError(ValueError):
 
 
 def validate_sleeve_config(
-    sleeves: list[dict],
+    sleeves: list[dict[str, object]],
     assignments: dict[int, str],
 ) -> None:
     """Validate sleeve weights sum to 1.0 and no duplicate instrument assignments.
@@ -49,7 +49,7 @@ def validate_sleeve_config(
 def create_sleeve_config(
     session: Session,
     name: str,
-    sleeves: list[dict],
+    sleeves: list[dict[str, object]],
     assignments: dict[int, str],
 ) -> SleeveConfig:
     """Create a new versioned sleeve config. Validates before writing.
