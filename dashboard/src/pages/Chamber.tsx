@@ -60,7 +60,7 @@ function ControlPanel({
   const lbl = 'text-[10px] font-mono uppercase tracking-widest text-slate-600'
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-[1fr_210px_140px_110px] gap-px bg-slate-800/60 rounded-xl overflow-hidden border border-slate-800">
+    <div className="grid grid-cols-1 md:grid-cols-[1fr_210px_140px_150px] gap-px bg-slate-800/60 rounded-xl overflow-hidden border border-slate-800">
 
       {/* ① Universe */}
       <div className={sec + ' space-y-2'}>
@@ -182,7 +182,7 @@ function ControlPanel({
         <button
           onClick={onConvene}
           disabled={convening || !!dataOp}
-          className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-colors bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
         >
           <RefreshCw size={13} className={convening ? 'animate-spin' : ''} />
           {convening ? 'Running…' : 'Re-convene'}
