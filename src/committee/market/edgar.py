@@ -93,6 +93,14 @@ _METRIC_CONCEPTS: dict[str, list[str]] = {
     ],
     "dividends_paid": ["Dividends", "DividendsPaidCommonStockCash", "PaymentsOfDividends"],
     "gross_profit": ["GrossProfit"],
+    "net_income": ["NetIncomeLoss", "NetIncome", "ProfitLoss"],
+    "total_assets": ["Assets"],
+    "operating_income": ["OperatingIncomeLoss"],
+    "shares_outstanding": [
+        "CommonStockSharesOutstanding",
+        "WeightedAverageNumberOfSharesOutstandingBasic",
+        "WeightedAverageNumberOfSharesOutstandingDiluted",
+    ],
 }
 
 

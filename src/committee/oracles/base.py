@@ -32,7 +32,7 @@ ORACLE_IDS = [
     "growth_visionary",
     "yield_harvester",
     "macro_tactician",
-    "quant",
+    "quality_compounder",
     "passive_pragmatist",
 ]
 

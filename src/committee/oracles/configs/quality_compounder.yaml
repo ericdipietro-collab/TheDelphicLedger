@@ -1,0 +1,18 @@
+id: quality_compounder
+display_name: "The Quality Compounder"
+rivals: [value_purist, growth_visionary]
+universe_filter: equity_only
+sleeve_targets:
+  equity_us: "0.50"
+  equity_intl: "0.20"
+  fixed_income: "0.20"
+  alternatives: "0.05"
+  cash: "0.05"
+metric_weights:
+  roic: 0.35
+  gross_profitability: 0.30
+  accruals_ratio: 0.20
+  debt_equity: 0.15
+persona_constraints:
+  min_score_to_buy: 0.0
+abstain_floor: 0.4

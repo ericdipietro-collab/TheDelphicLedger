@@ -266,6 +266,12 @@ def compute_universe_metrics(
     equity = _latest_fundamental(session, "equity", pit_date=pit_date)
     total_debt = _latest_fundamental(session, "total_debt", pit_date=pit_date)
     expense_raw = _latest_fundamental(session, "expense_ratio", pit_date=pit_date)
+    cfo = _latest_fundamental(session, "cfo", pit_date=pit_date)
+    capex = _latest_fundamental(session, "capex", pit_date=pit_date)
+    net_income = _latest_fundamental(session, "net_income", pit_date=pit_date)
+    total_assets = _latest_fundamental(session, "total_assets", pit_date=pit_date)
+    operating_income = _latest_fundamental(session, "operating_income", pit_date=pit_date)
+    shares_outstanding = _latest_fundamental(session, "shares_outstanding", pit_date=pit_date)
 
     # Revenue + gross_profit: two most-recent annual periods per instrument for YoY
     def _fetch_two_period_fundamental(metric: str) -> dict[int, list[tuple[date, float]]]:
@@ -349,6 +355,7 @@ def compute_universe_metrics(
     all_ids: set[int] = set()
     all_ids.update(prices.keys(), eps.keys(), equity.keys(), expense_raw.keys())
     all_ids.update(total_debt.keys(), price_history.keys(), revenue_by_inst.keys())
+    all_ids.update(total_assets.keys(), operating_income.keys(), net_income.keys())
     for h in holdings_rows:
         all_ids.add(h.instrument_id)
 
@@ -475,10 +482,56 @@ def compute_universe_metrics(
         else:
             m["gross_margin_yoy"] = None
 
-        # P/B and FCF yield: need shares outstanding (not yet in EDGAR fetch)
-        m["pb_ratio"] = None
-        m["fcf_yield"] = None
+        # P/B and FCF yield: need shares outstanding
+        shares = shares_outstanding.get(iid)
+        if price is not None and shares is not None and shares > 0:
+            market_cap = price * shares
+            eq = equity.get(iid)
+            if eq is not None and eq > 0:
+                m["pb_ratio"] = market_cap / eq
+            else:
+                m["pb_ratio"] = None
+            cfo_val = cfo.get(iid)
+            cap_val = capex.get(iid)
+            if cfo_val is not None and cap_val is not None and market_cap > 0:
+                m["fcf_yield"] = (cfo_val - cap_val) / market_cap
+            else:
+                m["fcf_yield"] = None
+        else:
+            m["pb_ratio"] = None
+            m["fcf_yield"] = None
+
         m["implied_turnover"] = None
+
+        # ── Quality factor metrics ────────────────────────────────────────────
+        eq = equity.get(iid)
+        debt = total_debt.get(iid)
+        assets = total_assets.get(iid)
+        op_inc = operating_income.get(iid)
+        ni = net_income.get(iid)
+        cfo_val = cfo.get(iid)
+
+        # ROIC = operating_income / (equity + total_debt)
+        if op_inc is not None and eq is not None and debt is not None:
+            invested_capital = eq + debt
+            m["roic"] = op_inc / invested_capital if invested_capital > 0 else None
+        else:
+            m["roic"] = None
+
+        # Gross profitability (Novy-Marx) = gross_profit / total_assets
+        gp_periods = gross_profit_by_inst.get(iid, [])
+        gp = gp_periods[0][1] if gp_periods else None
+        if gp is not None and assets is not None and assets > 0:
+            m["gross_profitability"] = gp / assets
+        else:
+            m["gross_profitability"] = None
+
+        # Accruals ratio = (net_income - cfo) / total_assets
+        # Negative means cash-backed earnings (good); positive means accruals dominate (bad)
+        if ni is not None and cfo_val is not None and assets is not None and assets > 0:
+            m["accruals_ratio"] = (ni - cfo_val) / assets
+        else:
+            m["accruals_ratio"] = None
 
         result[iid] = m
 

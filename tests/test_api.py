@@ -83,7 +83,7 @@ def _add_run(session: Session, iid: int, scenario_id: str | None = None) -> str:
         ("growth_visionary", "Growth Visionary"),
         ("yield_harvester", "Yield Harvester"),
         ("macro_tactician", "Macro Tactician"),
-        ("quant", "The Quant"),
+        ("quality_compounder", "The Quality Compounder"),
         ("passive_pragmatist", "Passive Pragmatist"),
     ]:
         session.add(Decision(

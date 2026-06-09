@@ -3,16 +3,16 @@ export const ORACLE_IDS = [
   'growth_visionary',
   'yield_harvester',
   'macro_tactician',
-  'quant',
+  'quality_compounder',
   'passive_pragmatist',
 ] as const
 
 export const ORACLE_DISPLAY: Record<string, string> = {
-  value_purist: 'Value Purist',
-  growth_visionary: 'Growth Visionary',
-  yield_harvester: 'Yield Harvester',
-  macro_tactician: 'Macro Tactician',
-  quant: 'The Quant',
+  value_purist:       'Value Purist',
+  growth_visionary:   'Growth Visionary',
+  yield_harvester:    'Yield Harvester',
+  macro_tactician:    'Macro Tactician',
+  quality_compounder: 'Quality Compounder',
   passive_pragmatist: 'Passive Pragmatist',
 }
 
@@ -21,7 +21,7 @@ export const ORACLE_SHORT: Record<string, string> = {
   growth_visionary:   'Growth',
   yield_harvester:    'Yield',
   macro_tactician:    'Macro',
-  quant:              'Quant',
+  quality_compounder: 'Quality',
   passive_pragmatist: 'Passive',
 }
 
@@ -30,7 +30,7 @@ export const ORACLE_COLOR: Record<string, string> = {
   growth_visionary:   '#10b981',
   yield_harvester:    '#0ea5e9',
   macro_tactician:    '#8b5cf6',
-  quant:              '#f43f5e',
+  quality_compounder: '#06b6d4',
   passive_pragmatist: '#64748b',
 }
 

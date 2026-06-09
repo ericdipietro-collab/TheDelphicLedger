@@ -41,12 +41,17 @@ METRICS: dict[str, MetricDef] = {
     "concentration_hhi": MetricDef("concentration_hhi", False, "Portfolio HHI contribution"),
     "individual_stock_pct": MetricDef("individual_stock_pct", False, "Individual-stock portfolio weight"),
     "implied_turnover": MetricDef("implied_turnover", False, "Implied portfolio turnover"),
+    # Quality factor metrics (Invariant E: float ratios, not dollar amounts)
+    "roic": MetricDef("roic", True, "Return on Invested Capital (op. income / invested capital)"),
+    "gross_profitability": MetricDef("gross_profitability", True, "Gross Profit / Total Assets (Novy-Marx)"),
+    "accruals_ratio": MetricDef("accruals_ratio", False, "Accruals ratio — lower = cash-backed earnings"),
 }
 
 # Equity-fundamental metrics: n/a for ETFs and mutual funds.
 EQUITY_FUNDAMENTAL_METRICS: frozenset[str] = frozenset({
     "pe_ratio", "pb_ratio", "fcf_yield", "debt_equity",
     "revenue_yoy", "gross_margin_yoy", "payout_ratio", "dividend_growth_years",
+    "roic", "gross_profitability", "accruals_ratio",
 })
 
 # Fund-specific metrics: n/a for stocks.

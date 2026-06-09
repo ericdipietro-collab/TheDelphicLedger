@@ -1,6 +1,6 @@
 id: passive_pragmatist
 display_name: "The Passive Pragmatist"
-rivals: [growth_visionary, quant]
+rivals: [growth_visionary, quality_compounder]
 universe_filter: null
 sleeve_targets:
   equity_us: "0.40"

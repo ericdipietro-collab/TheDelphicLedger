@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
-  ShieldCheck, Rocket, Banknote, Globe, Cpu, LayoutGrid,
+  ShieldCheck, Rocket, Banknote, Globe, Award, LayoutGrid,
   AlertTriangle, RefreshCw, TrendingUp, Info,
   CheckCircle2, Circle, ArrowRight,
 } from 'lucide-react'
@@ -199,7 +199,7 @@ const ORACLE_ICON = {
   growth_visionary:   Rocket,
   yield_harvester:    Banknote,
   macro_tactician:    Globe,
-  quant:              Cpu,
+  quality_compounder: Award,
   passive_pragmatist: LayoutGrid,
 } as Record<string, React.ElementType>
 
@@ -228,11 +228,11 @@ const ORACLE_PHILOSOPHY = {
     description: 'Reads the macro environment — yield curve shape, inflation regime, dollar strength, and volatility — to determine portfolio tilt. Does not score individual securities. Instead sets sleeve targets (equity vs. fixed income vs. alternatives) based on whether the regime is neutral, defensive, or aggressive. Uses hysteresis to avoid flip-flopping on noise.',
     goal: 'Right-size risk for the current macro regime',
   },
-  quant: {
-    tagline: 'Humans are biased',
-    metrics: 'RSI · MA · 12-1 · β',
-    description: 'Systematic and signal-driven — ignores narrative entirely. Scores on technical price signals: RSI(14), 50/200-day MA cross, 12-month-minus-1-month momentum factor, and beta to SPY. Assumes market participants exhibit predictable behavioral biases that create exploitable patterns in price data.',
-    goal: 'Capture systematic price-based factors',
+  quality_compounder: {
+    tagline: 'Business economics first',
+    metrics: 'ROIC · GP/Assets · Accruals · D/E',
+    description: 'Seeks businesses with durable competitive advantages reflected in exceptional capital efficiency. Scores on Return on Invested Capital, gross profitability (Novy-Marx), and accruals ratio (earnings quality — lower accruals mean cash-backed income). Indifferent to price: a mediocre business is still mediocre even when cheap.',
+    goal: 'Own businesses with exceptional economics',
   },
   passive_pragmatist: {
     tagline: 'Cost & concentration',
