@@ -114,12 +114,14 @@ Each oracle applies a single pre-committed investment philosophy. They score ind
 | **The Growth Visionary** | Category winners compounding at scale | Revenue YoY · margin trend · 6m momentum |
 | **The Yield Harvester** | The check clears — income above all | Distribution yield · payout ratio · dividend streak |
 | **The Macro Tactician** | Regime-aware ballast | T10Y3M · CPI · DXY · VIX |
-| **The Quant** | Humans are biased — price and risk only | RSI · MA cross · 12-1 momentum · beta vs SPY |
+| **The Quality Compounder** | Business economics first | ROIC · gross profitability · accruals ratio · D/E |
 | **The Passive Pragmatist** | Cost and concentration are the enemy | Expense ratio · HHI · implied turnover |
 
 Oracles emit scores, sleeve targets, and persona constraints — never trades. A single shared rebalancer consumes all oracle output and produces `TradeProposal` objects per oracle.
 
 The **Macro Tactician** is unique: it reads macro signals to set sleeve-level allocation tilts (equity, fixed income, alternatives) that the other oracles must satisfy. It uses asymmetric enter/exit bands with two-run confirmation to avoid flip-flopping on noise.
+
+The **Quality Compounder** implements the Novy-Marx quality factor: gross profit / total assets, combined with ROIC and an accruals ratio (lower accruals = earnings backed by cash, not accounting choices). Indifferent to price — a mediocre business is still mediocre even when cheap. Rivals both the Value Purist ("paying up for quality") and the Growth Visionary ("growth without quality is just revenue expansion").
 
 ---
 
