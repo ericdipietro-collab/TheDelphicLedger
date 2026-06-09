@@ -256,12 +256,12 @@ function OracleCardView({ card }: { card: OracleCard }) {
 
   return (
     <article
-      className="rounded-2xl overflow-hidden flex flex-col bg-slate-900"
+      className="rounded-2xl flex flex-col bg-slate-900 relative"
       style={{ border: `1px solid ${color}33` }}
     >
       {/* Identity header — gradient-tinted, icon tile + name */}
       <header
-        className="flex items-center gap-3 p-4"
+        className="flex items-center gap-3 p-4 overflow-hidden rounded-t-2xl"
         style={{
           background: `linear-gradient(180deg, ${color}1f 0%, transparent 100%)`,
           borderBottom: `1px solid ${color}22`,
@@ -295,7 +295,7 @@ function OracleCardView({ card }: { card: OracleCard }) {
               <Info size={13} />
             </button>
             <div
-              className="absolute right-0 top-8 z-20 w-72 rounded-xl p-3.5 text-xs leading-relaxed
+              className="absolute right-0 top-8 z-50 w-72 rounded-xl p-3.5 text-xs leading-relaxed
                          opacity-0 pointer-events-none group-hover/tooltip:opacity-100 group-hover/tooltip:pointer-events-auto
                          transition-opacity duration-150"
               style={{
