@@ -41,13 +41,9 @@ def validate_sleeve_config(
         raise SleeveValidationError("duplicate sleeve_key in sleeve list")
 
     valid_keys = set(keys)
-    seen: set[int] = set()
-    for iid, key in assignments.items():
+    for _iid, key in assignments.items():
         if key not in valid_keys:
             raise SleeveValidationError(f"assignment references unknown sleeve key {key!r}")
-        if iid in seen:
-            raise SleeveValidationError(f"duplicate instrument_id {iid} in assignments")
-        seen.add(iid)
 
 
 def create_sleeve_config(
@@ -63,7 +59,6 @@ def create_sleeve_config(
     """
     validate_sleeve_config(sleeves, assignments)
 
-    # Find existing configs with same name, set inactive
     existing = session.execute(
         select(SleeveConfig)
         .where(SleeveConfig.name == name, SleeveConfig.status == "active")
