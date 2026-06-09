@@ -348,3 +348,14 @@ def test_setup_status_includes_staleness_dates(client: TestClient) -> None:
     # Empty DB → both are null
     assert body["prices_as_of"] is None
     assert body["edgar_as_of"] is None
+
+
+# ── /api/data/fetch-progress ───────────────────────────────────────────────────
+
+def test_fetch_progress_endpoint_idle(client: TestClient) -> None:
+    r = client.get("/api/data/fetch-progress")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["operation"] is None
+    assert body["current"] == 0
+    assert body["total"] == 0

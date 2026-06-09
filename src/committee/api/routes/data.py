@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from datetime import date, timedelta
 from typing import Annotated
 
@@ -15,6 +16,9 @@ from committee.models import BundleState, Holding, Instrument, MarketObservation
 
 router = APIRouter(prefix="/api/data", tags=["data"])
 SessionDep = Annotated[Session, Depends(get_session)]
+
+_progress_lock = threading.Lock()
+_fetch_progress: dict[str, object] = {"operation": None, "current": 0, "total": 0}
 
 
 class RefreshResult(BaseModel):
@@ -114,6 +118,23 @@ def setup_status(session: SessionDep) -> SetupStatus:
     )
 
 
+class FetchProgress(BaseModel):
+    operation: str | None
+    current: int
+    total: int
+
+
+@router.get("/fetch-progress", response_model=FetchProgress)
+def fetch_progress_endpoint() -> FetchProgress:
+    """Return current fetch operation progress. Polls every second from the UI."""
+    with _progress_lock:
+        return FetchProgress(
+            operation=_fetch_progress["operation"],  # type: ignore[arg-type]
+            current=int(_fetch_progress["current"]),
+            total=int(_fetch_progress["total"]),
+        )
+
+
 # ── Fetch prices ──────────────────────────────────────────────────────────────
 
 @router.post("/fetch-prices", response_model=RefreshResult)
@@ -172,8 +193,14 @@ def fetch_prices(session: SessionDep) -> RefreshResult:
         ).all()
     )
 
+    to_fetch = [i for i in all_insts if i.ticker and i.id not in fresh_iids]
+
+    with _progress_lock:
+        _fetch_progress.update({"operation": "prices", "current": 0, "total": len(to_fetch)})
+
     total = 0
     skipped = 0
+    fetched_n = 0
     errors: list[str] = []
     unavailable: list[str] = []
     for inst in all_insts:
@@ -182,6 +209,9 @@ def fetch_prices(session: SessionDep) -> RefreshResult:
         if inst.id in fresh_iids:
             skipped += 1
             continue
+        fetched_n += 1
+        with _progress_lock:
+            _fetch_progress["current"] = fetched_n
         try:
             obs = adapter.fetch_eod(inst.ticker, start, end)
             n = save_price_observations(
@@ -199,6 +229,9 @@ def fetch_prices(session: SessionDep) -> RefreshResult:
                 unavailable.append(inst.ticker)
             else:
                 errors.append(f"{inst.ticker}: {e}")
+
+    with _progress_lock:
+        _fetch_progress.update({"operation": None, "current": 0, "total": 0})
 
     session.commit()
 
