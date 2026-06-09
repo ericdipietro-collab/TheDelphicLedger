@@ -231,6 +231,19 @@ export interface BundleInfo {
   last_refreshed_at: string | null
 }
 
+export interface SetupStatus {
+  has_holdings: boolean
+  holding_count: number
+  has_prices: boolean
+  price_count: number
+  has_macro: boolean
+  has_edgar: boolean
+  bundles_seeded: boolean
+  bundles_enabled: number
+  universe_size: number
+  has_run: boolean
+}
+
 export interface RecomputeRequest {
   run_id?: string
   constraint: string
@@ -252,6 +265,7 @@ export const api = {
   listScenarios: () => get<PackSummary[]>('/scenarios'),
   getScenario: (pack_id: string) => get<ScenarioResult>(`/scenarios/${pack_id}`),
   getRecon: () => get<ReconResponse>('/recon'),
+  getSetupStatus: () => get<SetupStatus>('/data/setup-status'),
   getConfig: () => get<ConfigResponse>('/config'),
   getBundles: () => get<BundleInfo[]>('/config/bundles'),
   setBundleEnabled: (id: string, enabled: boolean) =>

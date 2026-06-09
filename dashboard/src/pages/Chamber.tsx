@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import {
   ShieldCheck, Rocket, Banknote, Globe, Cpu, LayoutGrid,
-  AlertTriangle, Columns3, RefreshCw, TrendingUp, BarChart2, FileText, Tag, Boxes, Info,
+  AlertTriangle, RefreshCw, TrendingUp, BarChart2, FileText, Tag, Boxes, Info,
+  CheckCircle2, Circle, ArrowRight,
 } from 'lucide-react'
-import { api, BundleInfo, OracleCard, ChamberResponse, DissentRow, RivalObjection } from '../api'
+import { api, BundleInfo, OracleCard, ChamberResponse, DissentRow, RivalObjection, SetupStatus } from '../api'
 import { ORACLE_IDS, ORACLE_COLOR, ORACLE_DISPLAY, fmtScore, fmtPct, scoreColor, DIRECTION_COLOR } from '../constants'
 
 // ── Per-oracle identity metadata ──────────────────────────────────────────────
@@ -431,56 +432,218 @@ function ObjectionsList({ objections }: { objections: RivalObjection[] }) {
   )
 }
 
-// ── Empty / loading states ────────────────────────────────────────────────────
+// ── Setup checklist / empty state ────────────────────────────────────────────
+
+function SetupStep({
+  num,
+  done,
+  label,
+  detail,
+  action,
+  actionLabel,
+  running,
+  optional,
+}: {
+  num: number
+  done: boolean
+  label: string
+  detail: string
+  action?: () => void
+  actionLabel?: string
+  running?: boolean
+  optional?: boolean
+}) {
+  return (
+    <div className={`flex items-start gap-3 p-3.5 rounded-xl border transition-colors ${
+      done
+        ? 'bg-emerald-950/30 border-emerald-900/40'
+        : 'bg-slate-900 border-slate-800'
+    }`}>
+      <div className="flex-shrink-0 mt-0.5">
+        {done
+          ? <CheckCircle2 size={18} className="text-emerald-500" />
+          : <Circle size={18} className="text-slate-700" />
+        }
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className={`text-xs font-mono ${done ? 'text-emerald-600' : 'text-slate-600'}`}>
+            {optional ? 'optional' : `step ${num}`}
+          </span>
+          <span className={`text-sm font-medium ${done ? 'text-emerald-300' : 'text-slate-300'}`}>
+            {label}
+          </span>
+        </div>
+        <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">{detail}</p>
+      </div>
+      {action && !done && (
+        <button
+          onClick={action}
+          disabled={running}
+          className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 disabled:opacity-40"
+        >
+          {running
+            ? <RefreshCw size={11} className="animate-spin" />
+            : <ArrowRight size={11} />
+          }
+          {running ? 'Working…' : actionLabel}
+        </button>
+      )}
+    </div>
+  )
+}
 
 function EmptyState({
   error,
   onConvene,
   convening,
+  onDataOp,
+  dataOp,
+  setupStatus,
 }: {
   error: string | null
   onConvene: () => void
   convening: boolean
+  onDataOp: (op: 'prices' | 'macro' | 'edgar' | 'sleeves' | 'bundles') => void
+  dataOp: DataOp
+  setupStatus: SetupStatus | null
 }) {
+  const s = setupStatus
+
+  // All required steps done = ready to convene
+  const readyToConvene = !!s?.has_holdings && !!s?.has_prices
+
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6">
-      <div className="flex flex-col items-center gap-4">
-        <div className="flex items-end gap-1.5 h-10">
-          {Object.entries(ORACLE_COLOR).map(([id, color]) => (
-            <div
-              key={id}
-              className="w-2.5 rounded-t"
-              style={{ height: `${28 + Math.random() * 12}px`, background: color, opacity: 0.4 }}
-            />
-          ))}
-        </div>
-        <div className="flex items-center gap-2 text-slate-400">
-          <Columns3 size={18} className="text-slate-500" />
-          <span className="text-base font-medium">The Chamber is empty</span>
-        </div>
-        <p className="text-sm text-slate-600 text-center max-w-sm">
-          No deliberation run found. Convene the oracles to populate the Dissent Matrix.
-        </p>
-        <button
-          onClick={onConvene}
-          disabled={convening}
-          className="mt-1 flex items-center gap-2 px-4 py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sm text-slate-200 font-medium transition-colors disabled:opacity-50"
-        >
-          <RefreshCw size={14} className={convening ? 'animate-spin' : ''} />
-          {convening ? 'Convening…' : 'Convene the oracles'}
-        </button>
-      </div>
-      {error && (
-        <details className="max-w-sm w-full">
-          <summary className="text-xs text-slate-700 cursor-pointer hover:text-slate-500 flex items-center gap-1.5">
-            <AlertTriangle size={12} />
-            Technical detail
-          </summary>
-          <p className="mt-2 text-xs text-slate-700 font-mono break-all bg-slate-900 rounded p-2 border border-slate-800">
-            {error}
+    <div className="flex flex-col items-center justify-center min-h-[60vh] py-12">
+      <div className="w-full max-w-lg space-y-6">
+
+        {/* Header */}
+        <div className="flex flex-col items-center gap-3 text-center">
+          <div className="flex items-end gap-1.5 h-10">
+            {Object.entries(ORACLE_COLOR).map(([id, color]) => (
+              <div
+                key={id}
+                className="w-2.5 rounded-t"
+                style={{ height: `${28 + Math.random() * 12}px`, background: color, opacity: 0.35 }}
+              />
+            ))}
+          </div>
+          <h2 className="text-lg font-semibold text-slate-200">Welcome to The Chamber</h2>
+          <p className="text-sm text-slate-500 max-w-sm">
+            Complete the steps below before convening the oracles.
           </p>
-        </details>
-      )}
+        </div>
+
+        {/* Steps */}
+        {s ? (
+          <div className="space-y-2">
+            {/* Step 1: Import */}
+            <SetupStep
+              num={1}
+              done={!!s.has_holdings}
+              label="Import positions"
+              detail={s.has_holdings
+                ? `${s.holding_count} holdings loaded`
+                : 'Upload a positions CSV from Schwab, Fidelity, or Vanguard on the Import page.'}
+              action={!s.has_holdings ? () => window.location.href = '/import' : undefined}
+              actionLabel="Go to Import"
+            />
+
+            {/* Step 2: Fetch prices */}
+            <SetupStep
+              num={2}
+              done={!!s.has_prices}
+              label="Fetch prices"
+              detail={s.has_prices
+                ? `${s.price_count.toLocaleString()} price observations loaded`
+                : 'Download 380 days of EOD prices for your holdings (required for all oracles).'}
+              action={!s.has_prices ? () => onDataOp('prices') : undefined}
+              actionLabel="Fetch prices"
+              running={dataOp === 'prices'}
+            />
+
+            {/* Step 3: Fetch macro */}
+            <SetupStep
+              num={3}
+              done={!!s.has_macro}
+              label="Fetch macro data"
+              detail={s.has_macro
+                ? 'FRED macro series loaded (yield curve, CPI, VIX…)'
+                : 'FRED macro signals power the Macro Tactician regime detection.'}
+              action={!s.has_macro ? () => onDataOp('macro') : undefined}
+              actionLabel="Fetch macro"
+              running={dataOp === 'macro'}
+              optional
+            />
+
+            {/* Step 4: Fetch EDGAR */}
+            <SetupStep
+              num={4}
+              done={!!s.has_edgar}
+              label="Fetch fundamentals"
+              detail={s.has_edgar
+                ? 'EDGAR fundamentals loaded (P/E, revenue growth, FCF…)'
+                : 'SEC EDGAR XBRL fundamentals power the Value Purist, Growth Visionary, and Yield Harvester.'}
+              action={!s.has_edgar ? () => onDataOp('edgar') : undefined}
+              actionLabel="Fetch EDGAR"
+              running={dataOp === 'edgar'}
+              optional
+            />
+
+            {/* Step 5: Universe (optional) */}
+            <SetupStep
+              num={5}
+              done={s.bundles_enabled > 0 && s.universe_size > 0}
+              label="Expand buy universe"
+              detail={
+                s.universe_size > 0
+                  ? `${s.universe_size} universe instruments active (${s.bundles_enabled} bundle${s.bundles_enabled !== 1 ? 's' : ''} enabled)`
+                  : s.bundles_seeded
+                  ? 'Bundles seeded — enable at least one toggle above, then fetch prices again.'
+                  : 'Seed bundles to let the rebalancer propose buys beyond your current holdings.'
+              }
+              action={!s.bundles_seeded ? () => onDataOp('bundles') : undefined}
+              actionLabel="Seed bundles"
+              running={dataOp === 'bundles'}
+              optional
+            />
+          </div>
+        ) : (
+          <div className="flex justify-center py-4">
+            <RefreshCw size={16} className="animate-spin text-slate-600" />
+          </div>
+        )}
+
+        {/* Convene button */}
+        <div className="flex flex-col items-center gap-3 pt-2">
+          <button
+            onClick={onConvene}
+            disabled={convening || !readyToConvene}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors disabled:opacity-40
+              bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-500 disabled:cursor-not-allowed"
+          >
+            <RefreshCw size={14} className={convening ? 'animate-spin' : ''} />
+            {convening ? 'Convening…' : 'Convene the oracles'}
+          </button>
+          {!readyToConvene && s && (
+            <p className="text-xs text-slate-600">
+              {!s.has_holdings ? 'Import positions first (step 1)' : 'Fetch prices first (step 2)'}
+            </p>
+          )}
+        </div>
+
+        {error && (
+          <details className="w-full">
+            <summary className="text-xs text-slate-700 cursor-pointer hover:text-slate-500 flex items-center gap-1.5">
+              <AlertTriangle size={12} />
+              Technical detail
+            </summary>
+            <p className="mt-2 text-xs text-slate-700 font-mono break-all bg-slate-900 rounded p-2 border border-slate-800">
+              {error}
+            </p>
+          </details>
+        )}
+      </div>
     </div>
   )
 }
@@ -509,6 +672,9 @@ export function Chamber() {
   const [regimeSaving, setRegimeSaving] = useState(false)
   const [bundles, setBundles] = useState<BundleInfo[]>([])
   const [bundleToggling, setBundleToggling] = useState<string | null>(null)
+  const [setupStatus, setSetupStatus] = useState<SetupStatus | null>(null)
+
+  const refreshSetupStatus = () => api.getSetupStatus().then(setSetupStatus).catch(() => {})
 
   useEffect(() => {
     api.getLatestChamber().then(setData).catch(e => setError(String(e))).finally(() => setLoading(false))
@@ -517,6 +683,7 @@ export function Chamber() {
       if (cfg.available_profiles.length > 0) setProfiles(cfg.available_profiles)
     }).catch(() => {})
     api.getBundles().then(setBundles).catch(() => {})
+    refreshSetupStatus()
   }, [])
 
   const handleBundleToggle = async (id: string, enabled: boolean) => {
@@ -558,6 +725,7 @@ export function Chamber() {
       const res = await dataPost(paths[op])
       setDataMsg(res.message)
       if (op === 'bundles') api.getBundles().then(setBundles).catch(() => {})
+      refreshSetupStatus()
     } catch (e) {
       setError(String(e))
     } finally {
@@ -578,7 +746,16 @@ export function Chamber() {
       </div>
     </div>
   )
-  if (!data) return <EmptyState error={error} onConvene={handleConvene} convening={convening} />
+  if (!data) return (
+    <EmptyState
+      error={error}
+      onConvene={handleConvene}
+      convening={convening}
+      onDataOp={handleDataOp}
+      dataOp={dataOp}
+      setupStatus={setupStatus}
+    />
+  )
 
   const abstainedOracles = new Set(
     data.oracle_cards.filter(c => c.abstained).map(c => c.oracle_id)

@@ -23,6 +23,77 @@ class RefreshResult(BaseModel):
     count: int = 0
 
 
+# ── Setup status ──────────────────────────────────────────────────────────────
+
+class SetupStatus(BaseModel):
+    has_holdings: bool
+    holding_count: int
+    has_prices: bool
+    price_count: int
+    has_macro: bool
+    has_edgar: bool
+    bundles_seeded: bool
+    bundles_enabled: int
+    universe_size: int
+    has_run: bool
+
+
+@router.get("/setup-status", response_model=SetupStatus)
+def setup_status(session: SessionDep) -> SetupStatus:
+    """Return a snapshot of which setup steps have been completed."""
+    from committee.models import Fundamental
+
+    holding_count: int = session.execute(
+        select(func.count()).select_from(Holding).where(Holding.market_value.isnot(None))
+    ).scalar_one() or 0
+
+    price_count: int = session.execute(
+        select(func.count()).select_from(MarketObservation)
+        .where(MarketObservation.unit == "USD_adj_close")
+    ).scalar_one() or 0
+
+    has_macro: bool = (session.execute(
+        select(func.count()).select_from(MarketObservation)
+        .where(MarketObservation.source == "fred")
+    ).scalar_one() or 0) > 0
+
+    has_edgar: bool = (session.execute(
+        select(func.count()).select_from(Fundamental)
+    ).scalar_one() or 0) > 0
+
+    bundle_state_count: int = session.execute(
+        select(func.count()).select_from(BundleState)
+    ).scalar_one() or 0
+
+    bundles_enabled: int = session.execute(
+        select(func.count()).select_from(BundleState)
+        .where(BundleState.enabled == True)  # noqa: E712
+    ).scalar_one() or 0
+
+    universe_size: int = session.execute(
+        select(func.count()).select_from(UniverseEntry)
+    ).scalar_one() or 0
+
+    # Check if any convene run exists
+    from committee.models import Decision
+    has_run = (session.execute(
+        select(func.count()).select_from(Decision)
+    ).scalar_one() or 0) > 0
+
+    return SetupStatus(
+        has_holdings=holding_count > 0,
+        holding_count=holding_count,
+        has_prices=price_count > 0,
+        price_count=price_count,
+        has_macro=has_macro,
+        has_edgar=has_edgar,
+        bundles_seeded=bundle_state_count > 0,
+        bundles_enabled=bundles_enabled,
+        universe_size=universe_size,
+        has_run=has_run,
+    )
+
+
 # ── Fetch prices ──────────────────────────────────────────────────────────────
 
 @router.post("/fetch-prices", response_model=RefreshResult)
