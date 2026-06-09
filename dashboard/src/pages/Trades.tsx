@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { AlertTriangle, ArrowLeftRight, Download } from 'lucide-react'
+import Big from 'big.js'
 import { api, TradesResponse, OracleProposals, ConfigResponse } from '../api'
 import { ORACLE_IDS, ORACLE_COLOR, DIRECTION_COLOR, fmtMoney, fmtScore } from '../constants'
+import { parseSafe, add, fmtCurrency } from '../lib/decimal'
 
 interface Params {
   constraint: string
@@ -45,21 +47,21 @@ function ProposalTable({ oracleProposals, activeOracle, setActiveOracle }: Propo
 
       {/* Totals line for active oracle */}
       {current && current.proposals.length > 0 && (() => {
-        const sells = current.proposals
+        const sellsTotal = current.proposals
           .filter(p => p.direction === 'sell')
-          .reduce((s, p) => s + Math.abs(parseFloat(p.estimated_value ?? '0')), 0)
-        const buys = current.proposals
+          .reduce((s, p) => add(s, parseSafe(p.estimated_value).abs()), new Big(0))
+        const buysTotal = current.proposals
           .filter(p => p.direction === 'buy' && p.ticker !== 'CASH')
-          .reduce((s, p) => s + Math.abs(parseFloat(p.estimated_value ?? '0')), 0)
-        if (sells === 0 && buys === 0) return null
+          .reduce((s, p) => add(s, parseSafe(p.estimated_value).abs()), new Big(0))
+        if (sellsTotal.eq(new Big(0)) && buysTotal.eq(new Big(0))) return null
         return (
           <div className="flex items-center gap-3 mb-3 text-xs font-mono">
-            {sells > 0 && (
-              <span className="text-rose-400">−{fmtMoney(String(sells))} sells</span>
+            {sellsTotal.gt(new Big(0)) && (
+              <span className="text-rose-400">−{fmtCurrency(sellsTotal)} sells</span>
             )}
-            {sells > 0 && buys > 0 && <span className="text-slate-700">·</span>}
-            {buys > 0 && (
-              <span className="text-emerald-400">+{fmtMoney(String(buys))} buys</span>
+            {sellsTotal.gt(new Big(0)) && buysTotal.gt(new Big(0)) && <span className="text-slate-700">·</span>}
+            {buysTotal.gt(new Big(0)) && (
+              <span className="text-emerald-400">+{fmtCurrency(buysTotal)} buys</span>
             )}
           </div>
         )

@@ -56,6 +56,7 @@ export const DIRECTION_COLOR: Record<string, string> = {
   hold: '#64748b',
 }
 
+/** Display-only: converts decimal string to USD currency label. parseFloat acceptable here — display boundary only. */
 export function fmtMoney(s: string | null | undefined): string {
   if (!s || s === 'None') return 'n/a'
   const n = parseFloat(s)

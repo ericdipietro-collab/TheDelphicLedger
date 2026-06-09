@@ -3,6 +3,7 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis
 import { AlertTriangle, Wallet } from 'lucide-react'
 import { api, PortfolioResponse } from '../api'
 import { ORACLE_IDS, ORACLE_COLOR, ORACLE_DISPLAY, ORACLE_SHORT, SLEEVE_COLORS, SLEEVE_LABELS, fmtMoney, fmtPct, fmtScore, scoreColor } from '../constants'
+import { parseSafe, toChartNumber } from '../lib/decimal'
 
 export function Portfolio() {
   const [oracle, setOracle] = useState('value_purist')
@@ -42,7 +43,7 @@ export function Portfolio() {
 
   const pieData = data.allocations.map((a, i) => ({
     name: SLEEVE_LABELS[a.sleeve] ?? a.sleeve,
-    value: parseFloat(a.market_value),
+    value: toChartNumber(parseSafe(a.market_value)),
     color: SLEEVE_COLORS[i % SLEEVE_COLORS.length],
   })).filter(d => d.value > 0)
 
