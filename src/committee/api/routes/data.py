@@ -36,12 +36,15 @@ class SetupStatus(BaseModel):
     bundles_enabled: int
     universe_size: int
     has_run: bool
+    unresolved_count: int          # NEW
+    prices_as_of: date | None      # NEW
+    edgar_as_of: date | None       # NEW
 
 
 @router.get("/setup-status", response_model=SetupStatus)
 def setup_status(session: SessionDep) -> SetupStatus:
     """Return a snapshot of which setup steps have been completed."""
-    from committee.models import Fundamental
+    from committee.models import Fundamental, UnresolvedQueue
 
     holding_count: int = session.execute(
         select(func.count()).select_from(Holding).where(Holding.market_value.isnot(None))
@@ -74,11 +77,25 @@ def setup_status(session: SessionDep) -> SetupStatus:
         select(func.count()).select_from(UniverseEntry)
     ).scalar_one() or 0
 
-    # Check if any convene run exists
     from committee.models import Decision
     has_run = (session.execute(
         select(func.count()).select_from(Decision)
     ).scalar_one() or 0) > 0
+
+    unresolved_count: int = session.execute(
+        select(func.count()).select_from(UnresolvedQueue)
+        .where(UnresolvedQueue.queue_type == "instrument")
+        .where(UnresolvedQueue.resolved_at.is_(None))
+    ).scalar_one() or 0
+
+    prices_as_of: date | None = session.execute(
+        select(func.max(MarketObservation.observed_date))
+        .where(MarketObservation.unit == "USD_adj_close")
+    ).scalar_one()
+
+    edgar_as_of: date | None = session.execute(
+        select(func.max(Fundamental.filed_at))
+    ).scalar_one()
 
     return SetupStatus(
         has_holdings=holding_count > 0,
@@ -91,6 +108,9 @@ def setup_status(session: SessionDep) -> SetupStatus:
         bundles_enabled=bundles_enabled,
         universe_size=universe_size,
         has_run=has_run,
+        unresolved_count=unresolved_count,
+        prices_as_of=prices_as_of,
+        edgar_as_of=edgar_as_of,
     )
 
 

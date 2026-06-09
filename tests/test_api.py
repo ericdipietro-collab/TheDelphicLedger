@@ -327,3 +327,24 @@ def test_scenario_waterfall_decimal_strings(client: TestClient, db_path: Path) -
     for row in r.json()["waterfall"]:
         assert isinstance(row["before_mv"], str)
         assert isinstance(row["after_mv"], str)
+
+
+# ── /api/data/setup-status ─────────────────────────────────────────────────────
+
+def test_setup_status_includes_unresolved_count(client: TestClient) -> None:
+    r = client.get("/api/data/setup-status")
+    assert r.status_code == 200
+    body = r.json()
+    assert "unresolved_count" in body
+    assert body["unresolved_count"] == 0  # empty DB has no unresolved items
+
+
+def test_setup_status_includes_staleness_dates(client: TestClient) -> None:
+    r = client.get("/api/data/setup-status")
+    assert r.status_code == 200
+    body = r.json()
+    assert "prices_as_of" in body
+    assert "edgar_as_of" in body
+    # Empty DB → both are null
+    assert body["prices_as_of"] is None
+    assert body["edgar_as_of"] is None
