@@ -6,6 +6,7 @@ from decimal import Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -99,6 +100,85 @@ def get_trades(
         run_id=run_id,
         constraint=constraint or stored_constraint,
         oracle_proposals=oracle_proposals,
+    )
+
+
+@router.get("/export")
+def export_trades(
+    session: SessionDep,
+    format: str = Query(default="fidelity", description="Export format: fidelity or schwab"),
+    oracle: str = Query(default="value_purist", description="Oracle ID"),
+    run_id: str | None = Query(default=None),
+) -> Response:
+    """Export trade proposals as a broker-compatible CSV file."""
+    from decimal import Decimal
+
+    from committee.core.types import TradeProposal
+    from committee.models import Account
+    from committee.rebalancer.export import export_fidelity_csv, export_schwab_csv
+
+    if format not in ("fidelity", "schwab"):
+        raise HTTPException(status_code=400, detail="format must be 'fidelity' or 'schwab'")
+
+    # Find run_id
+    if run_id is None:
+        row_any = session.execute(
+            select(Decision)
+            .where(Decision.scenario_id.is_(None))
+            .order_by(Decision.run_at.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+        if row_any is None:
+            raise HTTPException(status_code=404, detail="No runs found.")
+        run_id = row_any.run_id
+
+    decision_row = session.execute(
+        select(Decision)
+        .where(Decision.run_id == run_id, Decision.persona_key == oracle)
+    ).scalar_one_or_none()
+
+    if decision_row is None:
+        raise HTTPException(status_code=404, detail=f"No decision row for oracle={oracle!r} run_id={run_id!r}")
+
+    # Reconstruct proposals
+    proposals: list[TradeProposal] = []
+    for p in decision_row.proposals_json or []:
+        proposals.append(TradeProposal(
+            instrument_id=int(p["instrument_id"]),
+            account_id=p["account_id"],
+            direction=p["direction"],
+            qty=Decimal(str(p.get("qty", "0"))),
+            estimated_value=Decimal(str(p.get("estimated_value", "0"))),
+            rationale_tags=p.get("tags", []),
+            oracle_score=p.get("oracle_score"),
+            tax_note=p.get("tax_note"),
+        ))
+
+    # Build ticker_map
+    all_iids = {p.instrument_id for p in proposals}
+    inst_map = _instrument_map(session, all_iids)
+    ticker_map: dict[int, str] = {
+        iid: inst.ticker
+        for iid, inst in inst_map.items()
+        if inst.ticker
+    }
+
+    # Build account_map (account_key → account_key)
+    account_map: dict[str, str] = {
+        acct.account_key: acct.account_key
+        for acct in session.execute(select(Account)).scalars().all()
+    }
+
+    if format == "fidelity":
+        csv_str, _ = export_fidelity_csv(proposals, ticker_map, oracle, account_map)
+    else:
+        csv_str, _ = export_schwab_csv(proposals, ticker_map, oracle, account_map)
+
+    filename = f"trades_{oracle}_{format}.csv"
+    return Response(
+        content=csv_str,
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 

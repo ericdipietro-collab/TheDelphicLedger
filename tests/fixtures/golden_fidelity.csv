@@ -1,0 +1,3 @@
+Account Number,Symbol,Action,Quantity,Order Type,Duration,Memo
+ACCT-001,AAPL,Buy,10,Market,Day,oracle:value_purist|drift
+ACCT-001,BND,Sell,5,Market,Day,oracle:value_purist|drift

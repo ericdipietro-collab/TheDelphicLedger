@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { AlertTriangle, ArrowLeftRight } from 'lucide-react'
+import { AlertTriangle, ArrowLeftRight, Download } from 'lucide-react'
 import { api, TradesResponse, OracleProposals, ConfigResponse } from '../api'
 import { ORACLE_IDS, ORACLE_COLOR, DIRECTION_COLOR, fmtMoney, fmtScore } from '../constants'
 
@@ -10,8 +10,13 @@ interface Params {
   new_money: number
 }
 
-function ProposalTable({ oracleProposals }: { oracleProposals: OracleProposals[] }) {
-  const [activeOracle, setActiveOracle] = useState<string>(ORACLE_IDS[0])
+interface ProposalTableProps {
+  oracleProposals: OracleProposals[]
+  activeOracle: string
+  setActiveOracle: (id: string) => void
+}
+
+function ProposalTable({ oracleProposals, activeOracle, setActiveOracle }: ProposalTableProps) {
 
   const current = oracleProposals.find(op => op.oracle_id === activeOracle)
 
@@ -151,6 +156,7 @@ export function Trades() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [recomputing, setRecomputing] = useState(false)
+  const [activeOracle, setActiveOracle] = useState<string>(ORACLE_IDS[0])
   const [params, setParams] = useState<Params>({
     constraint: 'unconstrained',
     drift_abs: 0.05,
@@ -279,7 +285,31 @@ export function Trades() {
 
       {/* Proposals */}
       <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
-        <ProposalTable oracleProposals={data.oracle_proposals} />
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex gap-2">
+            <a
+              href={`/api/trades/export?format=fidelity&oracle=${activeOracle}`}
+              download
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors border border-slate-700"
+            >
+              <Download size={12} />
+              Fidelity CSV
+            </a>
+            <a
+              href={`/api/trades/export?format=schwab&oracle=${activeOracle}`}
+              download
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors border border-slate-700"
+            >
+              <Download size={12} />
+              Schwab CSV
+            </a>
+          </div>
+        </div>
+        <ProposalTable
+          oracleProposals={data.oracle_proposals}
+          activeOracle={activeOracle}
+          setActiveOracle={setActiveOracle}
+        />
       </div>
     </div>
   )

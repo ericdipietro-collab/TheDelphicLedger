@@ -1990,6 +1990,108 @@ def demo(
         server_thread.join()
 
 
+@app.command("export-trades")
+def export_trades(
+    db: Path = _DB_PATH_OPT,
+    format: str = typer.Option("fidelity", "--format", "-f", help="Export format: fidelity or schwab"),
+    oracle: str = typer.Option("value_purist", "--oracle", "-o", help="Oracle ID to export proposals for"),
+    out: Path = typer.Option(Path("trades_export.csv"), "--out", help="Output file path"),  # noqa: B008
+    run_id: str | None = typer.Option(None, "--run-id", help="Run ID (default: latest non-scenario run)"),
+) -> None:
+    """Export trade proposals to a broker-compatible CSV file (Fidelity or Schwab)."""
+    from decimal import Decimal as _Decimal
+
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session as _Session
+
+    from committee.core.types import TradeProposal
+    from committee.db import get_session, init_db
+    from committee.models import Account, Decision, Instrument
+    from committee.rebalancer.export import export_fidelity_csv, export_schwab_csv
+
+    if format not in ("fidelity", "schwab"):
+        console.print("[red]--format must be 'fidelity' or 'schwab'[/red]")
+        raise typer.Exit(1)
+
+    init_db(db)
+    gen = get_session()
+    session = next(gen)
+    if not isinstance(session, _Session):
+        return
+    try:
+        # Find run_id
+        if run_id is None:
+            row_any = session.execute(
+                select(Decision)
+                .where(Decision.scenario_id.is_(None))
+                .order_by(Decision.run_at.desc())
+                .limit(1)
+            ).scalar_one_or_none()
+            if row_any is None:
+                console.print("[red]No committee runs found. Run `committee convene` first.[/red]")
+                raise typer.Exit(1)
+            run_id = row_any.run_id
+
+        # Find oracle row
+        decision_row = session.execute(
+            select(Decision)
+            .where(Decision.run_id == run_id, Decision.persona_key == oracle)
+        ).scalar_one_or_none()
+
+        if decision_row is None:
+            console.print(f"[red]No decision row found for oracle={oracle!r} run_id={run_id!r}[/red]")
+            raise typer.Exit(1)
+
+        # Reconstruct TradeProposal objects
+        proposals: list[TradeProposal] = []
+        for p in decision_row.proposals_json or []:
+            proposals.append(TradeProposal(
+                instrument_id=int(p["instrument_id"]),
+                account_id=p["account_id"],
+                direction=p["direction"],
+                qty=_Decimal(str(p.get("qty", "0"))),
+                estimated_value=_Decimal(str(p.get("estimated_value", "0"))),
+                rationale_tags=p.get("tags", []),
+                oracle_score=p.get("oracle_score"),
+                tax_note=p.get("tax_note"),
+            ))
+
+        # Build ticker_map from Instrument table
+        all_iids = {p.instrument_id for p in proposals}
+        ticker_map: dict[int, str] = {}
+        for iid in all_iids:
+            inst = session.get(Instrument, iid)
+            if inst and inst.ticker:
+                ticker_map[iid] = inst.ticker
+
+        # Build account_map from Account table (account_key → account_key)
+        account_map: dict[str, str] = {}
+        for acct in session.execute(select(Account)).scalars().all():
+            account_map[acct.account_key] = acct.account_key
+
+        # Export
+        if format == "fidelity":
+            csv_str, warnings = export_fidelity_csv(proposals, ticker_map, oracle, account_map)
+        else:
+            csv_str, warnings = export_schwab_csv(proposals, ticker_map, oracle, account_map)
+
+        for w in warnings:
+            console.print(f"[yellow]Warning: {w}[/yellow]")
+
+        out.write_text(csv_str, encoding="utf-8")
+        console.print(f"[green]Exported {len(proposals)} proposals → {out}[/green]")
+        console.print(f"[dim]oracle={oracle}  format={format}  run_id={run_id[:8]}…[/dim]")
+
+    except SystemExit:
+        raise
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        with contextlib.suppress(StopIteration):
+            next(gen)
+
+
 @app.command("serve")
 def serve(
     db: Path = _DB_PATH_OPT,
