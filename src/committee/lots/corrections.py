@@ -107,7 +107,10 @@ def validate_correction(
     """Validate correction against current holdings. Returns list of conflicts."""
     conflicts: list[CorrectionConflict] = []
     holding = session.execute(
-        select(Holding).where(Holding.instrument_id == correction.instrument_id)
+        select(Holding).where(
+            Holding.instrument_id == correction.instrument_id,
+            Holding.account_id == correction.account_key,
+        )
     ).scalar_one_or_none()
     if holding is not None and holding.qty is not None and correction.qty > holding.qty:
         conflicts.append(CorrectionConflict(

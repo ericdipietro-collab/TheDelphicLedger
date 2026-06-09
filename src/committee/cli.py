@@ -2220,6 +2220,7 @@ def lots_list(
     """List active lot corrections."""
     import contextlib
 
+    from sqlalchemy import select as sa_select
     from sqlalchemy.orm import Session as _Session
 
     from committee.db import get_session, init_db
@@ -2232,7 +2233,17 @@ def lots_list(
     if not isinstance(session, _Session):
         raise RuntimeError("get_session() did not yield a Session")
     try:
-        corrs = get_active_corrections(session)
+        inst_id: int | None = None
+        if ticker:
+            inst_row = session.execute(
+                sa_select(Instrument).where(Instrument.ticker == ticker)
+            ).scalar_one_or_none()
+            if inst_row is None:
+                console.print(f"[red]Instrument {ticker!r} not found.[/red]")
+                raise typer.Exit(1)
+            inst_id = inst_row.id
+
+        corrs = get_active_corrections(session, instrument_id=inst_id)
         if not corrs:
             console.print("No active corrections.")
             return
@@ -2246,8 +2257,6 @@ def lots_list(
         table.add_column("Status")
         for c in corrs:
             inst = session.get(Instrument, c.instrument_id)
-            if ticker and (inst is None or inst.ticker != ticker):
-                continue
             table.add_row(
                 str(c.id),
                 c.account_key,

@@ -597,16 +597,32 @@ def test_correction_does_not_change_holdings_qty(db_session):
 
 
 def test_corrections_module_has_no_delete_calls():
-    """Immutability invariant: corrections.py must never call session.delete()."""
+    """Immutability invariant: corrections.py must never call session.delete()
+    or import sqlalchemy's delete construct."""
     import ast
     import pathlib
-    src = pathlib.Path("src/committee/lots/corrections.py").read_text()
+    corrections_path = pathlib.Path(__file__).parent.parent / "src" / "committee" / "lots" / "corrections.py"
+    src = corrections_path.read_text()
     tree = ast.parse(src)
+
+    # Check for session.delete() attribute access
     for node in ast.walk(tree):
         if isinstance(node, ast.Attribute) and node.attr == "delete":
             raise AssertionError(
                 f"session.delete() call found at line {node.lineno} — corrections.py must be append-only"
             )
+
+    # Check for sqlalchemy Core delete import (execute(delete(...)) bypass)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            if "sqlalchemy" in (node.module or ""):
+                names = [alias.name for alias in node.names]
+                if "delete" in names:
+                    raise AssertionError(
+                        "from sqlalchemy import delete found — corrections.py must not use Core DELETE"
+                    )
+        elif isinstance(node, ast.Import):
+            pass  # bare import sqlalchemy is fine
 
 
 def test_validate_correction_detects_qty_conflict(db_session):
@@ -617,8 +633,8 @@ def test_validate_correction_detects_qty_conflict(db_session):
 
     inst = _inst(db_session, "CORR5")
 
-    # Insert a small holding
-    holding = Holding(instrument_id=inst.id, qty=Decimal("10.0000"), as_of=date(2024, 1, 1))
+    # Insert a small holding scoped to the same account as the correction
+    holding = Holding(instrument_id=inst.id, account_id="ACCT-CONFLICT", qty=Decimal("10.0000"), as_of=date(2024, 1, 1))
     db_session.add(holding)
     db_session.flush()
 
