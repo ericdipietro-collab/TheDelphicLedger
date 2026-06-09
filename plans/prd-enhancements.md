@@ -32,10 +32,10 @@ All requirements in this PRD must preserve the following invariants:
 
 ## 3. Goals
 
-- Produce identical oracle and trade outputs when rerun with identical dated inputs and configuration versions.
+- Produce identical oracle and trade outputs when rerun with identical dated inputs and configuration versions. 
 - Reduce operational fragility from stateful regime transitions and raw-provider complexity.
 - Support user-defined allocation taxonomies without creating account-specific analysis results.
-- Allow users to correct incomplete tax-lot data while preserving a complete audit trail.
+- Allow users to correct incomplete tax-lot data or correct errors.
 - Prevent precision loss between the Python engine, JSON API, and React dashboard.
 - Preserve local replay and historical-decision reproducibility when external providers revise data.
 
@@ -115,6 +115,10 @@ Native JavaScript `number` values may be used only for non-authoritative present
 
 No value converted to a JavaScript `number` may be sent back into the decision, trade, tax-lot, or persistence path as an authoritative financial value.
 
+### 5.6 Trade Proposal Export (Batch CSV)
+
+To reduce human error during execution, the system will export theoretical trade proposals into broker-compatible batch formats. This provides a bridge between the tool's deterministic output and the user's manual execution at their brokerage.
+
 ## 6. Functional Requirements
 
 ### FR-1: Replay-Stateless Macro Regime
@@ -150,7 +154,7 @@ No value converted to a JavaScript `number` may be sent back into the decision, 
 4. Provider revisions must create new records rather than update old records.
 5. Historical decision replay must resolve the same archived facts originally used.
 6. The UI must display the source and effective date of a fundamental fact.
-7. Provider conflicts must be visible and resolved through an explicit, deterministic precedence policy.
+7. Provider conflicts must be visible and resolved through an explicit, deterministic precedence policy.        
 8. Missing, stale, throttled, or unavailable providers must degrade cleanly without fabricating values.
 
 ### FR-3: Custom Sleeves
@@ -203,11 +207,27 @@ No value converted to a JavaScript `number` may be sent back into the decision, 
    - currency formatting;
    - percentage formatting.
 3. Financial values must never pass through `parseFloat`, `Number`, unary `+`, or native arithmetic before authoritative use.
-4. User-entered financial values must remain strings until validated and converted by the decimal library.
+4. User-entered financial values must never be stored as native numbers.      
 5. Form submissions must send normalized decimal strings.
 6. Rounding mode and supported scale must be centrally configured and consistent with the backend.
 7. Chart components may receive converted numeric values only through dedicated display-only adapters.
 8. Automated checks must detect prohibited native-number conversions on financial fields.
+
+### FR-6: Trade Proposal Export (Batch CSV)
+
+1. The system must provide a `committee export-trades` command.
+2. The dashboard must include a "Download Batch Trades" action in the Trades view.
+3. Supported formats must include:
+   - Fidelity Batch Trade CSV;
+   - Schwab Order Import CSV.
+4. Exported records must include:
+   - Account identifier;
+   - Symbol;
+   - Action (Buy/Sell);
+   - Quantity;
+   - Order Type (Market default);
+   - Rationale tag (Audit reference).
+5. The export must warn if any required broker-specific field (e.g., specific account number mapping) is missing from the `accounts` reference.
 
 ## 7. Data Model Requirements
 
@@ -236,19 +256,19 @@ Existing derived holdings and tax-lot tables remain rebuildable outputs, not edi
 
 | Edge Case | Required Behavior |
 |---|---|
-| Provider revises a historical fact | Store a new payload and fact version; preserve prior decision replay. |
-| EDGAR and normalized provider disagree | Surface conflict and apply documented deterministic precedence. |
+| Provider revises a historical fact | Store a new payload and fact version; preserve prior decision replay. |  
+| EDGAR and normalized provider disagree | Surface conflict and apply documented deterministic precedence. |    
 | Indicator is revised after decision date | Historical replay uses the version available at the decision date when available. |
 | User repeatedly runs Macro Tactician without new data | Result remains unchanged. |
 | Two observations share a date | They count as one confirmation date unless policy explicitly states otherwise. |
 | Custom sleeve is renamed | Historical decisions retain the old version and label. |
-| Instrument has no custom sleeve | Block authoritative drift/trade output for the affected configuration. |
+| Instrument has no custom sleeve | Block authoritative drift/trade output for the affected configuration. |    
 | Instrument maps to multiple sleeves | Reject the configuration until resolved. |
 | Sleeve targets do not sum to exactly `1` | Reject configuration save. |
 | User correction conflicts with broker import | Preserve both, flag conflict, and require explicit resolution policy. |
-| Correction quantity exceeds current account holding | Mark invalid or conflicted; do not silently apply. |
+| Correction quantity exceeds current account holding | Mark invalid or conflicted; do not silently apply. |    
 | Wash-sale activity spans household accounts | Analyze replacement activity across all relevant household accounts while preserving account-level lots. |
-| Corporate action changes basis | Require explicit supported action handling or degrade tax analysis. |
+| Corporate action changes basis | Require explicit supported action handling or degrade tax analysis. |        
 | Foreign-currency lot basis is entered | Preserve native currency and required FX provenance; do not silently assume USD. |
 | Decimal value exceeds chart-safe numeric range | Display through summarized or scaled presentation without affecting authoritative value. |
 
@@ -340,21 +360,20 @@ Conversions to JavaScript `number` occur only in display adapters and cannot aff
 
 ## 12. Success Metrics
 
-- Zero output changes across repeated runs with unchanged dated inputs.
+- Zero output changes across repeated runs with identical dated inputs.
 - Zero historical decision changes caused by provider revisions or taxonomy changes.
 - Zero source-record mutations from tax-lot correction workflows.
 - Zero known authoritative frontend financial calculations using native JavaScript numbers.
 - Macro Tactician meets the existing pre-committed live-influence backtest bar before its tilt affects trade proposals.
-- Users can resolve sleeve and lot-data issues without editing imported files or database rows directly.
+- Users can resolve sleeve and lot-data issues without editing imported files or database rows directly.        
 
 ## 13. Open Review Questions
 
 1. Should EDGAR remain mandatory for supported US equities, or may a normalized provider become the configured primary source?
 2. Which normalized fundamentals provider should ship first, and what are its point-in-time and licensing guarantees?
-3. What exact observation-date confirmation rule should replace the current two-run Macro Tactician rule?
+3. What exact observation-date confirmation rule should replace the current two-run Macro Tactician rule?       
 4. Should the circuit breaker be defensive-only, and which indicators may trigger it?
 5. Should custom sleeves replace the built-in taxonomy or exist as named alternative configurations?
-6. What decimal scale and rounding mode should be authoritative for money, quantities, prices, and weights?
+6. What decimal scale and rounding mode should be authoritative for money, quantities, prices, and weights?     
 7. Which corporate actions must be supported before user-entered lots are considered reliable enough for tax-aware proposals?
 8. When a broker import conflicts with a user lot correction, which source wins by default, if either?
-
