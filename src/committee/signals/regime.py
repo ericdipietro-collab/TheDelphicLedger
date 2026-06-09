@@ -19,7 +19,8 @@ the normal two-run process — no snap-back.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date as date_type
+from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -30,6 +31,9 @@ EXIT_DEFENSIVE = -0.10
 ENTER_AGGRESSIVE = +0.30
 EXIT_AGGRESSIVE = +0.10
 CONFIRMATION_RUNS = 2
+
+CONFIRMATION_WINDOW_DAYS = 14   # 14 calendar days ≈ 10 trading days
+CONFIRMATION_DATES_REQUIRED = 2  # distinct observation dates required
 
 _BASE_TARGETS: dict[str, str] = {
     "equity_us": "0.40",
@@ -141,6 +145,76 @@ def transition(state: RegimeFSMInput) -> RegimeFSMOutput:
         confirmation_count=1,
         tilt_changed=False,
         change_reason=None,
+    )
+
+
+@dataclass(frozen=True)
+class StatelessRegimeOutput:
+    tilt: str                            # "neutral" | "defensive" | "aggressive"
+    tilt_changed: bool
+    change_reason: str | None
+    confirmation_dates: list[date_type]  # dates that contributed to confirmation
+    policy_version: str
+
+
+def transition_stateless(
+    observations: list[tuple[date_type, float]],
+    current_tilt: str,
+    as_of: date_type,
+    policy_version: str,
+    credit_spread_veto: bool = False,
+) -> StatelessRegimeOutput:
+    """Replay-stateless regime determination.
+
+    Rules:
+    - Considers only observations within a rolling 14-calendar-day window ending at as_of.
+    - Requires >= 2 distinct observation dates where the entry condition holds.
+    - Two observations on the same date count as one confirmation date.
+    - Credit-spread circuit breaker: defensive immediately, no date confirmation needed.
+    - Same inputs always produce same output (pure function, no DB access).
+    """
+    # Circuit breaker fires immediately — no date confirmation required.
+    if credit_spread_veto and current_tilt != "defensive":
+        return StatelessRegimeOutput(
+            tilt="defensive",
+            tilt_changed=True,
+            change_reason="credit_spread_circuit_breaker",
+            confirmation_dates=[as_of],
+            policy_version=policy_version,
+        )
+
+    window_start = as_of - timedelta(days=CONFIRMATION_WINDOW_DAYS)
+
+    # Collect unique dates where the entry condition (desired != current) holds.
+    unique_confirmation_dates: set[date_type] = set()
+    last_desired: str = current_tilt
+    for obs_date, composite in sorted(observations):
+        if obs_date < window_start or obs_date > as_of:
+            continue
+        desired = _desired_tilt(composite, current_tilt)
+        if desired != current_tilt:
+            unique_confirmation_dates.add(obs_date)
+            last_desired = desired
+
+    sorted_conf_dates = sorted(unique_confirmation_dates)
+
+    if len(unique_confirmation_dates) >= CONFIRMATION_DATES_REQUIRED:
+        new_tilt = last_desired
+        if new_tilt != current_tilt:
+            return StatelessRegimeOutput(
+                tilt=new_tilt,
+                tilt_changed=True,
+                change_reason=f"date_confirmation:{new_tilt}",
+                confirmation_dates=sorted_conf_dates,
+                policy_version=policy_version,
+            )
+
+    return StatelessRegimeOutput(
+        tilt=current_tilt,
+        tilt_changed=False,
+        change_reason=None,
+        confirmation_dates=sorted_conf_dates,
+        policy_version=policy_version,
     )
 
 

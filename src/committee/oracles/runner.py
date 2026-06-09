@@ -15,7 +15,7 @@ pit_date and a carry-forward FSM state, never persisting to the DB.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -45,8 +45,8 @@ from committee.signals.regime import (
     RegimeFSMInput,
     RegimeFSMOutput,
     load_state,
-    save_state,
     transition,
+    transition_stateless,
 )
 
 _FUND_TYPES = frozenset({"etf", "mutual_fund"})
@@ -82,14 +82,57 @@ def _fetch_active_instruments(session: Session) -> dict[int, Instrument]:
     return combined
 
 
+def _build_obs_history(
+    session: Session,
+    as_of: date,
+    overrides: dict[str, float],
+) -> list[tuple[date, float]]:
+    """Return (obs_date, yield_curve_score_proxy) for dates in the 14-day window.
+
+    Uses T10Y3M as the primary proxy.  A full multi-signal per-date composite
+    would require rebuilding all signals for each historical date — deferred to
+    a future enhancement.
+    """
+    window_start = as_of - timedelta(days=14)
+
+    # If T10Y3M is overridden (scenario), contribute a single as_of point.
+    if "T10Y3M" in overrides:
+        score = yield_curve(float(overrides["T10Y3M"]) * 100.0)
+        return [(as_of, score.value)]
+
+    rows = session.execute(
+        select(MarketObservation.observed_date, MarketObservation.value)
+        .where(
+            MarketObservation.series_id == "T10Y3M",
+            MarketObservation.degraded == False,  # noqa: E712
+            MarketObservation.observed_date >= window_start,
+            MarketObservation.observed_date <= as_of,
+        )
+        .order_by(MarketObservation.observed_date)
+    ).all()
+
+    result: list[tuple[date, float]] = []
+    for obs_date, val in rows:
+        score = yield_curve(float(val) * 100.0)
+        result.append((obs_date, score.value))
+    return result
+
+
+def _get_current_tilt(session: Session) -> str:
+    """Read the persisted tilt from DB for live-UI continuity."""
+    return load_state(session).tilt
+
+
 def _run_macro_tactician(
     config: OracleConfig,
     session: Session,
     scenario: ScenarioContext | None = None,
     persist_regime: bool = True,
+    as_of: date | None = None,
 ) -> OracleOutput:
     """Macro Tactician: regime FSM → sleeve targets. No per-holding scores."""
     overrides = scenario.indicator_overrides if scenario else {}
+    as_of_date: date = as_of if as_of is not None else date.today()
 
     def _last_value(series_id: str) -> float | None:
         if series_id in overrides:
@@ -99,6 +142,7 @@ def _run_macro_tactician(
             .where(
                 MarketObservation.series_id == series_id,
                 MarketObservation.degraded == False,  # noqa: E712
+                MarketObservation.observed_date <= as_of_date,
             )
             .order_by(MarketObservation.observed_date.desc())
             .limit(1)
@@ -115,6 +159,7 @@ def _run_macro_tactician(
             .where(
                 MarketObservation.series_id == series_id,
                 MarketObservation.degraded == False,  # noqa: E712
+                MarketObservation.observed_date <= as_of_date,
             )
             .order_by(MarketObservation.observed_date.desc())
             .limit(2)
@@ -146,7 +191,10 @@ def _run_macro_tactician(
         # Compute 2-year percentile from DB observations
         obs_2y = session.execute(
             select(MarketObservation.value)
-            .where(MarketObservation.series_id == "BAMLH0A0HYM2")
+            .where(
+                MarketObservation.series_id == "BAMLH0A0HYM2",
+                MarketObservation.observed_date <= as_of_date,
+            )
             .order_by(MarketObservation.observed_date.desc())
             .limit(504)  # ~2 years of daily data
         ).scalars().all()
@@ -183,21 +231,30 @@ def _run_macro_tactician(
         for s in scores
     )
 
-    # Load, transition, save regime state
-    db_state = load_state(session)
-    fsm_in = RegimeFSMInput(
-        composite_score=comp_score,
+    # Build observation history for stateless confirmation.
+    obs_history = _build_obs_history(session, as_of_date, overrides)
+
+    # Determine policy version from config (fallback to "v1").
+    policy_version = str(config.version) if hasattr(config, "version") and config.version else "v1"
+
+    current_tilt = _get_current_tilt(session)
+    regime_result = transition_stateless(
+        observations=obs_history,
+        current_tilt=current_tilt,
+        as_of=as_of_date,
+        policy_version=policy_version,
         credit_spread_veto=veto,
-        current_tilt=db_state.tilt,
-        pending_tilt=db_state.pending_tilt,
-        confirmation_count=db_state.confirmation_count,
     )
-    fsm_out = transition(fsm_in)
+
     if persist_regime:
-        save_state(session, fsm_out, comp_score)
+        # Persist only the resolved tilt; confirmation is re-derived from obs at each call.
+        db_state = load_state(session)
+        db_state.tilt = regime_result.tilt
+        db_state.composite_score = comp_score  # type: ignore[assignment]
+        db_state.last_run_at = datetime.now()
 
     # Pick sleeve targets based on active tilt
-    tilt = fsm_out.tilt
+    tilt = regime_result.tilt
     if tilt == "defensive" and config.defensive_sleeve_targets:
         sleeve_targets = config.defensive_sleeve_targets
     elif tilt == "aggressive" and config.aggressive_sleeve_targets:

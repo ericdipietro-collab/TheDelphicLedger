@@ -89,16 +89,18 @@ Every user override → row in `deviations` (chosen action, committee's action, 
 
 Do not skip audit writes for "dry run" modes — write them with a `dry_run=True` flag or a separate record kind, but the write must happen.
 
-### J. Hysteresis on macro/regime tilt; stateless security scores
+### J. Observation-date confirmation for macro regime; stateless security scores
 
 Security-level oracle scores are **stateless** — the same inputs always produce the same score. No memory between runs for individual security scores.
 
-The macro/regime sleeve tilt (Macro Tactician) carries **hysteresis state** across runs:
-- Asymmetric enter/exit bands (entering a defensive tilt requires a stronger signal than exiting it)
-- Two-run confirmation before any tilt changes (prevents flip-flopping on noise)
-- Credit-spread / VIX circuit breaker may tighten defensively without waiting for the two-run confirmation
+The macro/regime sleeve tilt (Macro Tactician) uses **observation-date confirmation**:
+- A tilt change requires the entry (or exit) condition on at least two distinct observation dates within a rolling 10-trading-day window (≈14 calendar days) ending at `as_of`.
+- Two observations sharing a date count as one confirmation date.
+- Asymmetric enter/exit bands are preserved (enter defensive: < −0.30; exit: > −0.10).
+- Defensive-only circuit breaker (HY OAS credit spreads / VIX) may trigger immediately without date confirmation.
+- The same observation history, `as_of` date, and policy version always produce the same tilt, regardless of invocation count.
 
-This state lives in the database, not in memory. A process restart must recover the same regime state. Do not flatten this into a single-threshold rule — the asymmetric bands are intentional.
+The persisted `RegimeState` table stores the last computed tilt for live-UI continuity. It is NOT used for confirmation decisions — confirmation is derived from archived market observations at each call.
 
 ---
 
