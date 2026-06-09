@@ -558,16 +558,30 @@ function EmptyState({
         {/* Steps */}
         {s ? (
           <div className="space-y-2">
-            {/* Step 1: Import */}
+            {/* Step 1: Import & resolve */}
             <SetupStep
               num={1}
-              done={!!s.has_holdings}
-              label="Import positions"
-              detail={s.has_holdings
-                ? `${s.holding_count} holdings loaded`
-                : 'Upload a positions CSV from Schwab, Fidelity, or Vanguard on the Import page.'}
-              action={!s.has_holdings ? () => window.location.href = '/import' : undefined}
-              actionLabel="Go to Import"
+              done={!!s.has_holdings && (s.unresolved_count ?? 0) === 0}
+              label="Import & resolve positions"
+              detail={
+                !s.has_holdings
+                  ? 'Upload a positions CSV from Schwab, Fidelity, or Vanguard on the Import page.'
+                  : (s.unresolved_count ?? 0) > 0
+                    ? `${s.holding_count} holdings loaded · ${s.unresolved_count} unresolved instrument${s.unresolved_count !== 1 ? 's' : ''}`
+                    : `${s.holding_count} holdings loaded · all symbols mapped`
+              }
+              action={
+                !s.has_holdings
+                  ? () => { window.location.href = '/import' }
+                  : (s.unresolved_count ?? 0) > 0
+                    ? () => { window.location.href = '/resolve' }
+                    : undefined
+              }
+              actionLabel={
+                !s.has_holdings ? 'Go to Import'
+                  : (s.unresolved_count ?? 0) > 0 ? 'Resolve →'
+                  : undefined
+              }
             />
 
             {/* Step 2: Fetch prices */}
