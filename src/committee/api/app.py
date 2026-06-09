@@ -14,7 +14,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from committee.api.routes import actions, chamber, config, data, ingest, instruments, portfolio, recon, scenarios, trades
+from committee.api.routes import (
+    actions,
+    chamber,
+    config,
+    data,
+    ingest,
+    instruments,
+    portfolio,
+    recon,
+    scenarios,
+    trades,
+)
+from committee.api.routes.sleeves import router as sleeves_router
 
 
 @asynccontextmanager
@@ -51,6 +63,7 @@ app.include_router(trades.router)
 app.include_router(scenarios.router)
 app.include_router(recon.router)
 app.include_router(config.router)
+app.include_router(sleeves_router)
 
 # Serve built frontend if present
 _DIST = Path(__file__).parent.parent.parent.parent / "dashboard" / "dist"

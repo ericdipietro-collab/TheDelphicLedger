@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
-import { AlertTriangle, ArrowLeftRight } from 'lucide-react'
+import { AlertTriangle, ArrowLeftRight, Download } from 'lucide-react'
+import Big from 'big.js'
 import { api, TradesResponse, OracleProposals, ConfigResponse } from '../api'
 import { ORACLE_IDS, ORACLE_COLOR, DIRECTION_COLOR, fmtMoney, fmtScore } from '../constants'
+import { parseSafe, add, fmtCurrency } from '../lib/decimal'
 
 interface Params {
   constraint: string
@@ -10,8 +12,13 @@ interface Params {
   new_money: number
 }
 
-function ProposalTable({ oracleProposals }: { oracleProposals: OracleProposals[] }) {
-  const [activeOracle, setActiveOracle] = useState<string>(ORACLE_IDS[0])
+interface ProposalTableProps {
+  oracleProposals: OracleProposals[]
+  activeOracle: string
+  setActiveOracle: (id: string) => void
+}
+
+function ProposalTable({ oracleProposals, activeOracle, setActiveOracle }: ProposalTableProps) {
 
   const current = oracleProposals.find(op => op.oracle_id === activeOracle)
 
@@ -40,21 +47,21 @@ function ProposalTable({ oracleProposals }: { oracleProposals: OracleProposals[]
 
       {/* Totals line for active oracle */}
       {current && current.proposals.length > 0 && (() => {
-        const sells = current.proposals
+        const sellsTotal = current.proposals
           .filter(p => p.direction === 'sell')
-          .reduce((s, p) => s + Math.abs(parseFloat(p.estimated_value ?? '0')), 0)
-        const buys = current.proposals
+          .reduce((s, p) => add(s, parseSafe(p.estimated_value).abs()), new Big(0))
+        const buysTotal = current.proposals
           .filter(p => p.direction === 'buy' && p.ticker !== 'CASH')
-          .reduce((s, p) => s + Math.abs(parseFloat(p.estimated_value ?? '0')), 0)
-        if (sells === 0 && buys === 0) return null
+          .reduce((s, p) => add(s, parseSafe(p.estimated_value).abs()), new Big(0))
+        if (sellsTotal.eq(new Big(0)) && buysTotal.eq(new Big(0))) return null
         return (
           <div className="flex items-center gap-3 mb-3 text-xs font-mono">
-            {sells > 0 && (
-              <span className="text-rose-400">−{fmtMoney(String(sells))} sells</span>
+            {sellsTotal.gt(new Big(0)) && (
+              <span className="text-rose-400">−{fmtCurrency(sellsTotal)} sells</span>
             )}
-            {sells > 0 && buys > 0 && <span className="text-slate-700">·</span>}
-            {buys > 0 && (
-              <span className="text-emerald-400">+{fmtMoney(String(buys))} buys</span>
+            {sellsTotal.gt(new Big(0)) && buysTotal.gt(new Big(0)) && <span className="text-slate-700">·</span>}
+            {buysTotal.gt(new Big(0)) && (
+              <span className="text-emerald-400">+{fmtCurrency(buysTotal)} buys</span>
             )}
           </div>
         )
@@ -151,6 +158,7 @@ export function Trades() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [recomputing, setRecomputing] = useState(false)
+  const [activeOracle, setActiveOracle] = useState<string>(ORACLE_IDS[0])
   const [params, setParams] = useState<Params>({
     constraint: 'unconstrained',
     drift_abs: 0.05,
@@ -279,7 +287,31 @@ export function Trades() {
 
       {/* Proposals */}
       <div className="rounded-xl border border-slate-800 bg-slate-900 p-5">
-        <ProposalTable oracleProposals={data.oracle_proposals} />
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex gap-2">
+            <a
+              href={`/api/trades/export?format=fidelity&oracle=${activeOracle}`}
+              download
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors border border-slate-700"
+            >
+              <Download size={12} />
+              Fidelity CSV
+            </a>
+            <a
+              href={`/api/trades/export?format=schwab&oracle=${activeOracle}`}
+              download
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors border border-slate-700"
+            >
+              <Download size={12} />
+              Schwab CSV
+            </a>
+          </div>
+        </div>
+        <ProposalTable
+          oracleProposals={data.oracle_proposals}
+          activeOracle={activeOracle}
+          setActiveOracle={setActiveOracle}
+        />
       </div>
     </div>
   )

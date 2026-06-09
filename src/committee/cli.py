@@ -12,8 +12,12 @@ from rich.table import Table
 app = typer.Typer(name="committee", add_completion=False)
 universe_app = typer.Typer(name="universe", help="Manage the instrument universe (bundles).")
 recon_app = typer.Typer(name="recon", help="Quantity reconciliation (run, list, show, resolve).")
+lots_app = typer.Typer(name="lots", help="Tax-lot correction workflow.")
+sleeves_app = typer.Typer(name="sleeves", help="Custom sleeve configuration.")
 app.add_typer(universe_app, name="universe")
 app.add_typer(recon_app, name="recon")
+app.add_typer(lots_app, name="lots")
+app.add_typer(sleeves_app, name="sleeves")
 console = Console()
 
 _DB_PATH_OPT = typer.Option(Path("data/ledger.db"), "--db", help="SQLite database path")
@@ -1640,6 +1644,7 @@ def backtest(
     db: Path = _DB_PATH_OPT,
     date_from: str = typer.Option("", "--from", help="Start date YYYY-MM-DD (default: 1 year ago)"),
     date_to: str = typer.Option("", "--to", help="End date YYYY-MM-DD (default: today)"),
+    as_of: str | None = typer.Option(None, "--as-of", help="Cap observations to ≤ this ISO date YYYY-MM-DD"),
     perturb: bool = typer.Option(False, "--perturb", help="Include ±50% drift-parameter perturbation report"),
 ) -> None:
     """Point-in-time regime-tilt backtest vs. Passive Pragmatist benchmark.
@@ -1660,6 +1665,7 @@ def backtest(
     try:
         d_from = _date.fromisoformat(date_from) if date_from else today.replace(year=today.year - 1)
         d_to = _date.fromisoformat(date_to) if date_to else today
+        d_as_of = _date.fromisoformat(as_of) if as_of else None
     except ValueError as e:
         console.print(f"[red]Invalid date format: {e}[/red]")
         raise typer.Exit(1) from None
@@ -1669,10 +1675,12 @@ def backtest(
     session = next(gen)
     try:
         console.print(f"\n[bold]Committee backtest[/bold]  {d_from} → {d_to}")
+        if d_as_of is not None:
+            console.print(f"[dim]as-of cutoff: {d_as_of}[/dim]")
         console.print("[dim]Benchmark: Passive Pragmatist (neutral allocation)[/dim]")
         console.print("[dim]Tilt: Macro Tactician (regime-driven)[/dim]\n")
 
-        report = run_backtest(session, d_from, d_to, perturb=perturb)
+        report = run_backtest(session, d_from, d_to, perturb=perturb, as_of=d_as_of)
 
         if report.note:
             console.print(f"[yellow]Note: {report.note.replace('_', ' ')}[/yellow]")
@@ -1691,6 +1699,7 @@ def backtest(
         tbl.add_column("Max DD", justify="right")
         tbl.add_column("Ulcer", justify="right")
         tbl.add_column("Switches", justify="right")
+        tbl.add_column("Response Lag (days)", justify="right")
 
         for m in (report.benchmark_metrics, report.tilt_metrics):
             if m.oracle_id == "passive_pragmatist":
@@ -1710,6 +1719,7 @@ def backtest(
                 _fmt(m.max_drawdown, pct=False) if m.max_drawdown is not None else "n/a",
                 f"{m.ulcer_index:.3f}" if m.ulcer_index is not None else "n/a",
                 str(m.switch_count) if m.oracle_id == "macro_tactician" else "—",
+                str(m.response_lag) if m.response_lag is not None else "n/a",
             )
         console.print(tbl)
 
@@ -1990,6 +2000,108 @@ def demo(
         server_thread.join()
 
 
+@app.command("export-trades")
+def export_trades(
+    db: Path = _DB_PATH_OPT,
+    format: str = typer.Option("fidelity", "--format", "-f", help="Export format: fidelity or schwab"),
+    oracle: str = typer.Option("value_purist", "--oracle", "-o", help="Oracle ID to export proposals for"),
+    out: Path = typer.Option(Path("trades_export.csv"), "--out", help="Output file path"),  # noqa: B008
+    run_id: str | None = typer.Option(None, "--run-id", help="Run ID (default: latest non-scenario run)"),
+) -> None:
+    """Export trade proposals to a broker-compatible CSV file (Fidelity or Schwab)."""
+    from decimal import Decimal as _Decimal
+
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session as _Session
+
+    from committee.core.types import TradeProposal
+    from committee.db import get_session, init_db
+    from committee.models import Account, Decision, Instrument
+    from committee.rebalancer.export import export_fidelity_csv, export_schwab_csv
+
+    if format not in ("fidelity", "schwab"):
+        console.print("[red]--format must be 'fidelity' or 'schwab'[/red]")
+        raise typer.Exit(1)
+
+    init_db(db)
+    gen = get_session()
+    session = next(gen)
+    if not isinstance(session, _Session):
+        return
+    try:
+        # Find run_id
+        if run_id is None:
+            row_any = session.execute(
+                select(Decision)
+                .where(Decision.scenario_id.is_(None))
+                .order_by(Decision.run_at.desc())
+                .limit(1)
+            ).scalar_one_or_none()
+            if row_any is None:
+                console.print("[red]No committee runs found. Run `committee convene` first.[/red]")
+                raise typer.Exit(1)
+            run_id = row_any.run_id
+
+        # Find oracle row
+        decision_row = session.execute(
+            select(Decision)
+            .where(Decision.run_id == run_id, Decision.persona_key == oracle)
+        ).scalar_one_or_none()
+
+        if decision_row is None:
+            console.print(f"[red]No decision row found for oracle={oracle!r} run_id={run_id!r}[/red]")
+            raise typer.Exit(1)
+
+        # Reconstruct TradeProposal objects
+        proposals: list[TradeProposal] = []
+        for p in decision_row.proposals_json or []:
+            proposals.append(TradeProposal(
+                instrument_id=int(p["instrument_id"]),
+                account_id=p["account_id"],
+                direction=p["direction"],
+                qty=_Decimal(str(p.get("qty", "0"))),
+                estimated_value=_Decimal(str(p.get("estimated_value", "0"))),
+                rationale_tags=p.get("tags", []),
+                oracle_score=p.get("oracle_score"),
+                tax_note=p.get("tax_note"),
+            ))
+
+        # Build ticker_map from Instrument table
+        all_iids = {p.instrument_id for p in proposals}
+        ticker_map: dict[int, str] = {}
+        for iid in all_iids:
+            inst = session.get(Instrument, iid)
+            if inst and inst.ticker:
+                ticker_map[iid] = inst.ticker
+
+        # Build account_map from Account table (account_key → account_key)
+        account_map: dict[str, str] = {}
+        for acct in session.execute(select(Account)).scalars().all():
+            account_map[acct.account_key] = acct.account_key
+
+        # Export
+        if format == "fidelity":
+            csv_str, warnings = export_fidelity_csv(proposals, ticker_map, oracle, account_map)
+        else:
+            csv_str, warnings = export_schwab_csv(proposals, ticker_map, oracle, account_map)
+
+        for w in warnings:
+            console.print(f"[yellow]Warning: {w}[/yellow]")
+
+        out.write_text(csv_str, encoding="utf-8")
+        console.print(f"[green]Exported {len(proposals)} proposals → {out}[/green]")
+        console.print(f"[dim]oracle={oracle}  format={format}  run_id={run_id[:8]}…[/dim]")
+
+    except SystemExit:
+        raise
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        with contextlib.suppress(StopIteration):
+            next(gen)
+
+
 @app.command("serve")
 def serve(
     db: Path = _DB_PATH_OPT,
@@ -2035,6 +2147,213 @@ def serve(
         port=port,
         log_level="warning",
     )
+
+
+@lots_app.command("add")
+def lots_add(
+    account: str = typer.Argument(..., help="Account key"),
+    ticker: str = typer.Argument(..., help="Ticker symbol"),
+    acquired: str = typer.Argument(..., help="Acquired date YYYY-MM-DD"),
+    qty: str = typer.Argument(..., help="Quantity as decimal string"),
+    cost: str = typer.Argument(..., help="Cost per share as decimal string"),
+    reason: str = typer.Argument(..., help="Reason for correction"),
+    db: Path = _DB_PATH_OPT,
+) -> None:
+    """Add a tax-lot correction."""
+    import contextlib
+    from datetime import date as date_type
+    from decimal import Decimal, InvalidOperation
+
+    from sqlalchemy import select as sa_select
+    from sqlalchemy.orm import Session as _Session
+
+    from committee.db import get_session, init_db
+    from committee.lots.corrections import add_correction, validate_correction
+    from committee.models import Instrument
+
+    try:
+        acq_date = date_type.fromisoformat(acquired)
+        qty_d = Decimal(qty)
+        cost_d = Decimal(cost)
+    except (ValueError, InvalidOperation) as exc:
+        console.print(f"[red]Invalid argument: {exc}[/red]")
+        raise typer.Exit(1) from None
+
+    init_db(db)
+    gen = get_session()
+    session = next(gen)
+    if not isinstance(session, _Session):
+        raise RuntimeError("get_session() did not yield a Session")
+    try:
+        inst = session.execute(
+            sa_select(Instrument).where(Instrument.ticker == ticker)
+        ).scalar_one_or_none()
+        if inst is None:
+            console.print(f"[red]Instrument {ticker!r} not found.[/red]")
+            raise typer.Exit(1)
+
+        corr = add_correction(
+            session, account, inst.id, acq_date, qty_d, cost_d,
+            "user_asserted", date_type.today(), reason,
+        )
+        session.flush()
+        conflicts = validate_correction(session, corr)
+        if conflicts:
+            for c in conflicts:
+                console.print(f"[yellow]Warning: {c.conflict_reason}[/yellow]")
+            corr.validation_status = "conflicted"
+        session.commit()
+        console.print(f"[green]Correction added (id={corr.id}, status={corr.validation_status})[/green]")
+    except SystemExit:
+        raise
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        with contextlib.suppress(StopIteration):
+            next(gen)
+
+
+@lots_app.command("list")
+def lots_list(
+    db: Path = _DB_PATH_OPT,
+    ticker: str | None = typer.Option(None, "--ticker"),
+) -> None:
+    """List active lot corrections."""
+    import contextlib
+
+    from sqlalchemy import select as sa_select
+    from sqlalchemy.orm import Session as _Session
+
+    from committee.db import get_session, init_db
+    from committee.lots.corrections import get_active_corrections
+    from committee.models import Instrument
+
+    init_db(db)
+    gen = get_session()
+    session = next(gen)
+    if not isinstance(session, _Session):
+        raise RuntimeError("get_session() did not yield a Session")
+    try:
+        inst_id: int | None = None
+        if ticker:
+            inst_row = session.execute(
+                sa_select(Instrument).where(Instrument.ticker == ticker)
+            ).scalar_one_or_none()
+            if inst_row is None:
+                console.print(f"[red]Instrument {ticker!r} not found.[/red]")
+                raise typer.Exit(1)
+            inst_id = inst_row.id
+
+        corrs = get_active_corrections(session, instrument_id=inst_id)
+        if not corrs:
+            console.print("No active corrections.")
+            return
+        table = Table(title="Active Lot Corrections")
+        table.add_column("ID")
+        table.add_column("Account")
+        table.add_column("Ticker")
+        table.add_column("Acquired")
+        table.add_column("Qty")
+        table.add_column("Cost/Share")
+        table.add_column("Status")
+        for c in corrs:
+            inst = session.get(Instrument, c.instrument_id)
+            table.add_row(
+                str(c.id),
+                c.account_key,
+                inst.ticker if inst else "?",
+                str(c.acquired_date),
+                str(c.qty),
+                str(c.cost_per_share),
+                c.validation_status,
+            )
+        console.print(table)
+    except SystemExit:
+        raise
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        with contextlib.suppress(StopIteration):
+            next(gen)
+
+
+@sleeves_app.command("create")
+def sleeves_create(
+    name: str = typer.Argument(..., help="Config name"),
+    spec: str = typer.Argument(..., help="JSON: [{key,label,weight},...] or path to JSON file"),
+    db: Path = _DB_PATH_OPT,
+) -> None:
+    """Create a new sleeve configuration (JSON spec)."""
+    import json
+
+    from committee.core.sleeves import SleeveValidationError, create_sleeve_config
+    from committee.db import get_session, init_db
+
+    try:
+        spec_data = json.loads(spec)
+    except (json.JSONDecodeError, ValueError):
+        # Try as file path
+        try:
+            spec_data = json.loads(Path(spec).read_text())
+        except Exception as exc:
+            console.print(f"[red]Cannot parse spec: {exc}[/red]")
+            raise typer.Exit(1) from None
+
+    sleeves_raw = spec_data if isinstance(spec_data, list) else spec_data.get("sleeves", [])
+    assignments_raw = spec_data.get("assignments", {}) if isinstance(spec_data, dict) else {}
+    assignments = {int(k): v for k, v in assignments_raw.items()}
+
+    init_db(db)
+    gen = get_session()
+    session = next(gen)
+    try:
+        config = create_sleeve_config(session, name, sleeves_raw, assignments)
+        session.commit()
+        console.print(f"[green]Created {name!r} version {config.version} (id={config.id})[/green]")
+    except SleeveValidationError as exc:
+        console.print(f"[red]Validation error: {exc}[/red]")
+        raise typer.Exit(1) from None
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        with contextlib.suppress(StopIteration):
+            next(gen)
+
+
+@sleeves_app.command("list")
+def sleeves_list(
+    db: Path = _DB_PATH_OPT,
+) -> None:
+    """List all sleeve configurations."""
+    from committee.core.sleeves import list_configs
+    from committee.db import get_session, init_db
+
+    init_db(db)
+    gen = get_session()
+    session = next(gen)
+    try:
+        configs = list_configs(session)
+        if not configs:
+            console.print("No sleeve configs found.")
+            return
+        table = Table(title="Sleeve Configurations")
+        table.add_column("ID")
+        table.add_column("Name")
+        table.add_column("Version")
+        table.add_column("Status")
+        table.add_column("Sleeves")
+        for c in configs:
+            sleeve_summary = ", ".join(
+                f"{d.sleeve_key}:{d.target_weight}" for d in sorted(c.definitions, key=lambda x: x.sort_order)
+            )
+            table.add_row(str(c.id), c.name, str(c.version), c.status, sleeve_summary)
+        console.print(table)
+    finally:
+        with contextlib.suppress(StopIteration):
+            next(gen)
 
 
 if __name__ == "__main__":

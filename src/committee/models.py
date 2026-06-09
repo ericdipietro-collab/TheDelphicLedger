@@ -4,7 +4,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import Index, JSON, Date, DateTime, ForeignKey, Integer, Text, func
+from sqlalchemy import JSON, Date, DateTime, ForeignKey, Index, Integer, Text, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from committee.types import DecimalText
@@ -162,6 +162,87 @@ class TaxLot(Base):
     qty: Mapped[Decimal] = mapped_column(DecimalText, nullable=False)
     cost_per_share: Mapped[Decimal] = mapped_column(DecimalText, nullable=False)
     basis_quality: Mapped[str] = mapped_column(Text, nullable=False)  # "exact" | "average_fallback"
+    origin: Mapped[str | None] = mapped_column(
+        Text, nullable=True, default="broker_derived"
+    )  # "broker_derived" | "snapshot_fallback" | "user_asserted" | "user_corrected"
+
+
+class LotCorrection(Base):
+    """Append-only tax-lot correction. Never mutate or delete rows.
+
+    User corrections override broker-derived lots in derive_lots() (FR-4.7).
+    validation_status: "active" | "conflicted" | "superseded" | "invalid"
+    """
+
+    __tablename__ = "lot_corrections"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    supersedes_id: Mapped[int | None] = mapped_column(
+        ForeignKey("lot_corrections.id"), nullable=True
+    )
+    account_key: Mapped[str] = mapped_column(Text, nullable=False)
+    instrument_id: Mapped[int] = mapped_column(ForeignKey("instruments.id"), nullable=False)
+    acquired_date: Mapped[date] = mapped_column(Date, nullable=False)
+    qty: Mapped[Decimal] = mapped_column(DecimalText, nullable=False)
+    cost_per_share: Mapped[Decimal] = mapped_column(DecimalText, nullable=False)
+    basis_quality: Mapped[str] = mapped_column(Text, nullable=False)  # "user_asserted" | "user_corrected"
+    effective_date: Mapped[date] = mapped_column(Date, nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    validation_status: Mapped[str] = mapped_column(Text, nullable=False, default="active")
+    currency: Mapped[str] = mapped_column(Text, nullable=False, default="USD")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, server_default=func.now()
+    )
+
+    instrument: Mapped[Instrument] = relationship()
+
+
+class SleeveConfig(Base):
+    """Versioned custom sleeve configuration. Immutable once created."""
+
+    __tablename__ = "sleeve_configs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="active")  # active | inactive
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
+
+    definitions: Mapped[list[SleeveDefinition]] = relationship(back_populates="config")
+    assignments: Mapped[list[SleeveAssignment]] = relationship(back_populates="config")
+
+
+class SleeveDefinition(Base):
+    """One sleeve within a SleeveConfig."""
+
+    __tablename__ = "sleeve_definitions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    config_id: Mapped[int] = mapped_column(ForeignKey("sleeve_configs.id"), nullable=False)
+    sleeve_key: Mapped[str] = mapped_column(Text, nullable=False)
+    label: Mapped[str] = mapped_column(Text, nullable=False)
+    target_weight: Mapped[Decimal] = mapped_column(DecimalText, nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    config: Mapped[SleeveConfig] = relationship(back_populates="definitions")
+
+
+class SleeveAssignment(Base):
+    """Maps an instrument to exactly one sleeve in a SleeveConfig."""
+
+    __tablename__ = "sleeve_assignments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    config_id: Mapped[int] = mapped_column(ForeignKey("sleeve_configs.id"), nullable=False)
+    instrument_id: Mapped[int] = mapped_column(ForeignKey("instruments.id"), nullable=False)
+    sleeve_key: Mapped[str] = mapped_column(Text, nullable=False)
+
+    config: Mapped[SleeveConfig] = relationship(back_populates="assignments")
+    instrument: Mapped[Instrument] = relationship()
+
+    __table_args__ = (
+        Index("ix_sleeve_assign_config_instrument", "config_id", "instrument_id", unique=True),
+    )
 
 
 class Holding(Base):
@@ -333,3 +414,45 @@ class Deviation(Base):
     recorded_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.now()
     )
+
+
+class ProviderPayload(Base):
+    """Immutable archive of a raw provider response.
+
+    New records on each fetch; never update existing records (Invariant B, FR-2.4).
+    """
+
+    __tablename__ = "provider_payloads"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    provider_name: Mapped[str] = mapped_column(Text, nullable=False)  # "edgar" | "yfinance" | "fred"
+    endpoint: Mapped[str] = mapped_column(Text, nullable=False)  # URL or dataset ID
+    retrieved_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    effective_date: Mapped[date | None] = mapped_column(Date, nullable=True)  # filing date if known
+    payload_hash: Mapped[str] = mapped_column(Text, nullable=False)  # SHA-256 hex
+    parser_version: Mapped[str] = mapped_column(Text, nullable=False)
+    normalization_policy_version: Mapped[str] = mapped_column(Text, nullable=False)
+    raw_payload: Mapped[Any] = mapped_column(JSON, nullable=False)
+
+
+class NormalizedFact(Base):
+    """Normalized fact derived from a provider payload.
+
+    Retains field-level provenance to the archived payload (FR-2.3).
+    New records on provider revision (FR-2.4).
+    """
+
+    __tablename__ = "normalized_facts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    payload_id: Mapped[int] = mapped_column(ForeignKey("provider_payloads.id"), nullable=False)
+    instrument_id: Mapped[int | None] = mapped_column(ForeignKey("instruments.id"), nullable=True)
+    fact_key: Mapped[str] = mapped_column(Text, nullable=False)  # e.g. "pe_ratio", "roic"
+    period: Mapped[str | None] = mapped_column(Text, nullable=True)  # e.g. "2023-12-31"
+    unit: Mapped[str | None] = mapped_column(Text, nullable=True)  # e.g. "ratio", "USD"
+    value: Mapped[str] = mapped_column(Text, nullable=False)  # serialized decimal string
+    normalization_policy_version: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
+
+    payload: Mapped[ProviderPayload] = relationship()
+    instrument: Mapped[Instrument | None] = relationship()

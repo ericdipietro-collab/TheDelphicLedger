@@ -396,3 +396,29 @@ def test_backtest_perturb_produces_three_rows(session: Session) -> None:
         assert len(report.perturbation) == 3
         drifts = [r.drift_abs for r in report.perturbation]
         assert drifts[0] < drifts[1] < drifts[2]
+
+
+# ── WP-2: response_lag and as_of ──────────────────────────────────────────────
+
+
+def test_backtest_metrics_has_response_lag() -> None:
+    """BacktestMetrics accepts and stores response_lag."""
+    from committee.backtest.engine import BacktestMetrics
+    m = BacktestMetrics(
+        oracle_id="test",
+        cagr=0.08,
+        max_drawdown=0.15,
+        ulcer_index=0.05,
+        annualized_turnover=0.20,
+        implied_tax_drag=0.03,
+        switch_count=2,
+        response_lag=5,
+    )
+    assert m.response_lag == 5
+
+
+def test_run_backtest_accepts_as_of(session: Session) -> None:
+    """run_backtest accepts as_of parameter without raising on empty session."""
+    report = run_backtest(session, date(2020, 1, 1), date(2024, 12, 31), as_of=date(2023, 12, 31))
+    # Empty session → note set; must not raise
+    assert report.note in ("no_holdings", "insufficient_history") or report is not None

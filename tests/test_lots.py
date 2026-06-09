@@ -500,3 +500,153 @@ def test_unwind_funds_excluded(db_session):
     tickers = {a.instrument.ticker for a in analyses}
     assert "AAPL" in tickers
     assert "VTI" not in tickers
+
+
+# ── WP-5: Lot correction tests ──────────────────────────────────────────
+
+from committee.lots.corrections import (  # noqa: E402
+    CorrectionConflict,
+    add_correction,
+    get_active_corrections,
+    supersede_correction,
+    validate_correction,
+)
+from committee.models import LotCorrection  # noqa: E402
+
+
+def test_add_correction_creates_active_row(db_session):
+    """add_correction creates an active LotCorrection row."""
+    inst = _inst(db_session, "CORR1")
+    corr = add_correction(
+        session=db_session,
+        account_key="ACCT-TEST",
+        instrument_id=inst.id,
+        acquired_date=date(2022, 3, 15),
+        qty=Decimal("50.0000"),
+        cost_per_share=Decimal("142.5000"),
+        basis_quality="user_asserted",
+        effective_date=date(2024, 1, 1),
+        reason="Test correction",
+    )
+    db_session.flush()
+    assert corr.id is not None
+    assert corr.validation_status == "active"
+    assert corr.supersedes_id is None
+
+
+def test_supersede_creates_new_marks_old_superseded(db_session):
+    """supersede_correction creates a new row and marks prior as superseded."""
+    inst = _inst(db_session, "CORR2")
+    c1 = add_correction(
+        db_session, "ACCT-TEST", inst.id,
+        date(2022, 3, 15), Decimal("50.0000"), Decimal("142.5000"),
+        "user_asserted", date(2024, 1, 1), "first",
+    )
+    db_session.flush()
+    c2 = supersede_correction(
+        db_session, c1.id, Decimal("48.0000"), Decimal("143.0000"), "qty correction",
+    )
+    db_session.flush()
+    assert c2.supersedes_id == c1.id
+    assert c2.validation_status == "active"
+    db_session.refresh(c1)
+    assert c1.validation_status == "superseded"
+
+
+def test_get_active_corrections_filters_superseded(db_session):
+    """get_active_corrections excludes superseded rows."""
+    inst = _inst(db_session, "CORR3")
+    c1 = add_correction(
+        db_session, "ACCT-TEST", inst.id,
+        date(2022, 3, 15), Decimal("50.0000"), Decimal("142.5000"),
+        "user_asserted", date(2024, 1, 1), "first",
+    )
+    db_session.flush()
+    supersede_correction(db_session, c1.id, Decimal("48.0000"), Decimal("143.0000"), "fix")
+    db_session.flush()
+    active = get_active_corrections(db_session, instrument_id=inst.id)
+    ids = [c.id for c in active]
+    assert c1.id not in ids  # superseded
+
+
+def test_correction_does_not_change_holdings_qty(db_session):
+    """Applying a correction must not change holding quantities (AC-8)."""
+    from sqlalchemy import select as sa_select
+
+    from committee.models import Holding
+
+    inst = _inst(db_session, "CORR4")
+
+    qty_before = {
+        h.instrument_id: h.qty
+        for h in db_session.execute(sa_select(Holding)).scalars().all()
+        if h.qty is not None
+    }
+    add_correction(
+        db_session, "ACCT-TEST", inst.id,
+        date(2022, 3, 15), Decimal("5.0000"), Decimal("100.0000"),
+        "user_asserted", date(2024, 1, 1), "test",
+    )
+    db_session.flush()
+    qty_after = {
+        h.instrument_id: h.qty
+        for h in db_session.execute(sa_select(Holding)).scalars().all()
+        if h.qty is not None
+    }
+    assert qty_before == qty_after
+
+
+def test_corrections_module_has_no_delete_calls():
+    """Immutability invariant: corrections.py must never call session.delete()
+    or import sqlalchemy's delete construct."""
+    import ast
+    import pathlib
+    corrections_path = pathlib.Path(__file__).parent.parent / "src" / "committee" / "lots" / "corrections.py"
+    src = corrections_path.read_text()
+    tree = ast.parse(src)
+
+    # Check for session.delete() attribute access
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Attribute) and node.attr == "delete":
+            raise AssertionError(
+                f"session.delete() call found at line {node.lineno} — corrections.py must be append-only"
+            )
+
+    # Check for sqlalchemy Core delete import (execute(delete(...)) bypass)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            if "sqlalchemy" in (node.module or ""):
+                names = [alias.name for alias in node.names]
+                if "delete" in names:
+                    raise AssertionError(
+                        "from sqlalchemy import delete found — corrections.py must not use Core DELETE"
+                    )
+        elif isinstance(node, ast.Import):
+            pass  # bare import sqlalchemy is fine
+
+
+def test_validate_correction_detects_qty_conflict(db_session):
+    """validate_correction returns a CorrectionConflict when correction qty > holding qty."""
+    from sqlalchemy import select as sa_select
+
+    from committee.models import Holding
+
+    inst = _inst(db_session, "CORR5")
+
+    # Insert a small holding scoped to the same account as the correction
+    holding = Holding(instrument_id=inst.id, account_id="ACCT-CONFLICT", qty=Decimal("10.0000"), as_of=date(2024, 1, 1))
+    db_session.add(holding)
+    db_session.flush()
+
+    # Correction with qty larger than holding — should conflict
+    corr = add_correction(
+        db_session, "ACCT-CONFLICT", inst.id,
+        date(2022, 1, 10), Decimal("999.0000"), Decimal("50.0000"),
+        "user_asserted", date(2024, 1, 1), "conflict test",
+    )
+    db_session.flush()
+
+    conflicts = validate_correction(db_session, corr)
+    assert len(conflicts) == 1
+    assert conflicts[0].conflict_reason == "correction_qty_exceeds_current_holding"
+    assert conflicts[0].broker_qty == Decimal("10.0000")

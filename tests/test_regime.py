@@ -1,8 +1,11 @@
 """Tests for the regime FSM — pure function, no DB needed."""
 
+from datetime import date as date_type
+
 from committee.signals.regime import (
     RegimeFSMInput,
     transition,
+    transition_stateless,
 )
 
 
@@ -155,3 +158,45 @@ def test_db_state_persists_across_transitions(tmp_path):
         assert state2.pending_tilt == "defensive"
         assert state2.confirmation_count == 1
         assert abs(float(state2.composite_score) - (-0.40)) < 0.001
+
+
+# ── transition_stateless tests ─────────────────────────────────────────────────
+
+def test_stateless_same_date_not_enough():
+    """Two observations on same date = 1 confirmation date = no confirmation."""
+    obs = [(date_type(2024, 1, 2), -0.35), (date_type(2024, 1, 2), -0.35)]
+    result = transition_stateless(obs, "neutral", date_type(2024, 1, 3), "v1")
+    assert result.tilt == "neutral"
+
+
+def test_stateless_two_distinct_dates_confirm():
+    """Two distinct dates in window = confirmation."""
+    obs = [(date_type(2024, 1, 2), -0.35), (date_type(2024, 1, 3), -0.35)]
+    result = transition_stateless(obs, "neutral", date_type(2024, 1, 10), "v1")
+    assert result.tilt == "defensive"
+
+
+def test_stateless_lookahead_excluded():
+    """Observations after as_of must not affect result."""
+    obs_in_window = [(date_type(2024, 1, 2), -0.35), (date_type(2024, 1, 3), -0.35)]
+    obs_with_future = obs_in_window + [(date_type(2024, 1, 15), -0.35)]
+    r1 = transition_stateless(obs_in_window, "neutral", date_type(2024, 1, 10), "v1")
+    r2 = transition_stateless(obs_with_future, "neutral", date_type(2024, 1, 10), "v1")
+    assert r1.tilt == r2.tilt
+
+
+def test_stateless_circuit_breaker_immediate():
+    """Circuit breaker fires immediately, no dates needed."""
+    obs = [(date_type(2024, 1, 2), 0.40)]  # bullish, but veto overrides
+    result = transition_stateless(obs, "neutral", date_type(2024, 1, 2), "v1", credit_spread_veto=True)
+    assert result.tilt == "defensive"
+    assert result.change_reason == "credit_spread_circuit_breaker"
+
+
+def test_stateless_deterministic():
+    """Same inputs → same output, always."""
+    obs = [(date_type(2024, 1, 2), -0.35), (date_type(2024, 1, 3), -0.35)]
+    r1 = transition_stateless(obs, "neutral", date_type(2024, 1, 10), "v1")
+    r2 = transition_stateless(obs, "neutral", date_type(2024, 1, 10), "v1")
+    assert r1.tilt == r2.tilt
+    assert r1.change_reason == r2.change_reason

@@ -1,0 +1,3 @@
+Account,Symbol,Action,Quantity,Order Type,Duration,Description
+ACCT-001,AAPL,Buy to Open,10,Market,Good for Day,oracle:value_purist|drift
+ACCT-001,BND,Sell to Close,5,Market,Good for Day,oracle:value_purist|drift

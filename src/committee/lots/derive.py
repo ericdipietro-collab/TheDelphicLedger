@@ -89,6 +89,7 @@ def derive_lots(session: Session, fallback_date: date | None = None) -> int:
                         qty=qty,
                         cost_per_share=cost_per_share,
                         basis_quality="exact",
+                        origin="broker_derived",
                     )
                 )
                 total += 1
@@ -137,8 +138,41 @@ def derive_lots(session: Session, fallback_date: date | None = None) -> int:
                     qty=snap.qty,
                     cost_per_share=cost_per_share,
                     basis_quality="average_fallback",
+                    origin="snapshot_fallback",
                 )
             )
+            total += 1
+
+    # Apply user corrections: user wins over broker-derived (FR-4.7)
+    from committee.lots.corrections import get_active_corrections
+    from committee.models import TaxLot as _TaxLot
+
+    active_corrs = get_active_corrections(session)
+    for corr in active_corrs:
+        existing = session.execute(
+            select(_TaxLot).where(
+                _TaxLot.instrument_id == corr.instrument_id,
+                _TaxLot.account_id == corr.account_key,
+                _TaxLot.acquired_date == corr.acquired_date,
+            )
+        ).scalar_one_or_none()
+        if existing is not None:
+            # User correction wins: overwrite cost/qty on derived row
+            existing.cost_per_share = corr.cost_per_share
+            existing.qty = corr.qty
+            existing.basis_quality = corr.basis_quality
+            existing.origin = "user_corrected"
+        else:
+            # No existing derived lot: assert correction as new lot
+            session.add(_TaxLot(
+                instrument_id=corr.instrument_id,
+                account_id=corr.account_key,
+                acquired_date=corr.acquired_date,
+                qty=corr.qty,
+                cost_per_share=corr.cost_per_share,
+                basis_quality=corr.basis_quality,
+                origin="user_asserted",
+            ))
             total += 1
 
     return total
