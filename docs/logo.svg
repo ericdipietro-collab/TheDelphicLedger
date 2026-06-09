@@ -23,10 +23,10 @@
   <rect x="143" y="41" width="28" height="8" rx="1.5" fill="#8B5CF6"/>
   <rect x="143" y="115" width="28" height="4" rx="1" fill="#C4B5FD"/>
 
-  <!-- The Quant — rose -->
-  <rect x="180" y="66" width="22" height="52" fill="#F43F5E" opacity="0.9"/>
-  <rect x="177" y="59" width="28" height="8" rx="1.5" fill="#F43F5E"/>
-  <rect x="177" y="115" width="28" height="4" rx="1" fill="#FDA4AF"/>
+  <!-- Quality Compounder — cyan -->
+  <rect x="180" y="66" width="22" height="52" fill="#06B6D4" opacity="0.9"/>
+  <rect x="177" y="59" width="28" height="8" rx="1.5" fill="#06B6D4"/>
+  <rect x="177" y="115" width="28" height="4" rx="1" fill="#67E8F9"/>
 
   <!-- Passive Pragmatist — slate -->
   <rect x="214" y="56" width="22" height="62" fill="#64748B" opacity="0.9"/>

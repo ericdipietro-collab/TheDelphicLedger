@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="docs/logo.svg" alt="The Delphic Ledger" width="280"/>
+</div>
+
 # The Delphic Ledger
 
 > *"Know thy holdings."* — after the inscription at the Temple of Apollo at Delphi
@@ -7,6 +11,19 @@
 A local portfolio analysis engine and engineering showcase. Import real broker exports, reconcile them against your transaction ledger, enrich with live market data and SEC filings, then convene six investor archetypes — each applying an incompatible philosophy to score your holdings and propose conflicting rebalancing trades.
 
 > **Not investment advice.** The oracles are fictional characters; their scores and trade proposals are entertainment built on real-world mechanics. Nothing here should be construed as a recommendation to buy, sell, or hold any security.
+
+---
+
+## Screenshots
+
+![The Chamber](docs/screenshots/dashboard-chamber.png)
+*The Chamber — six oracle verdicts, regime state, and the control panel for data refresh and convening.*
+
+![Portfolio](docs/screenshots/dashboard-portfolio.png)
+*Portfolio — allocation breakdown with per-oracle scores and drift-vs-target chart.*
+
+![Trades](docs/screenshots/dashboard-trades.png)
+*Trades — rebalancing proposals per oracle with direction, quantity, estimated value, and score.*
 
 ---
 
@@ -46,9 +63,9 @@ uv run committee demo --open
 
 ---
 
-## Using your own portfolio data
+## Using your own portfolio data — step by step
 
-### 1 — Import broker CSVs
+### Step 1 — Import broker CSVs
 
 Export positions and transaction history from your broker. Fidelity, Schwab, and Vanguard are recognized automatically; other formats are mapped interactively on first import.
 
@@ -59,7 +76,7 @@ uv run committee import-file examples/schwab_transactions.csv
 
 On first import of an unknown format, the header mapper runs a fuzzy match and prompts you to confirm or correct each column. Your confirmation is saved as a reusable template in `profiles/`.
 
-### 2 — Resolve instruments
+### Step 2 — Resolve instruments
 
 Anything the auto-resolver couldn't confidently identify lands in a queue. Nothing below the confidence threshold is silently accepted — every decision is written to `mapping_decisions`.
 
@@ -68,39 +85,54 @@ uv run committee resolve
 # or use the Resolve page in the dashboard
 ```
 
-### 3 — Start the dashboard
+### Step 3 — Start the dashboard
 
 ```bash
 uv run committee serve
 # opens http://127.0.0.1:7777 automatically
 ```
 
-### 4 — Fetch market data (from the Chamber)
+### Step 4 — Fetch market data
 
-The Chamber's **Refresh data** panel shows staleness per source and lets you trigger each fetch individually:
+In the Chamber's **Refresh data** panel, trigger each data source:
 
-- **Fetch prices** — 380-day EOD prices for all holdings + active universe. Fetches ~850 tickers in parallel (~30s via yfinance batch download; faster with Tiingo).
-- **Fetch macro** — FRED series: T10Y3M, CPI, DXY, VIX, credit spreads.
-- **Fetch EDGAR** — SEC XBRL annual fundamentals for held stocks and universe stocks.
+- **Fetch prices** — 380-day EOD prices for all holdings + active universe. Fetches ~850 tickers in parallel (~30s via yfinance batch download; faster with a Tiingo key).
+- **Fetch EDGAR** — SEC XBRL annual fundamentals for held stocks and universe stocks. Required for Value, Quality Compounder, and Growth oracles to score equities.
+- **Fetch macro** — FRED series: T10Y3M, CPI, DXY, VIX, credit spreads. Required for the Macro Tactician regime signal.
 
-### 5 — Seed the buy universe
+A progress bar appears in the UI while each fetch runs. Staleness dates update once the fetch completes.
 
-By default, oracles only score holdings. To let them consider buy candidates, enable bundles from the Chamber's **Universe** section:
+### Step 5 — Seed the buy universe (optional)
 
-1. Click **Seed** — registers bundle instruments in the database
-2. Toggle the bundles you want active
-3. Fetch prices (only the newly-added tickers download; existing ones are skipped)
-4. Re-convene
+By default, oracles only score your existing holdings. To let them consider buy candidates from a broader universe, use the **Universe** section in the Chamber:
 
-### 6 — Convene the oracles
+1. Click **Seed** next to any bundle (e.g., `sp500`, `etf_core`) — registers its instruments in the database
+2. Toggle bundles active/inactive
+3. Click **Fetch prices** again — only newly-added tickers download; existing ones are skipped
+4. Re-convene — oracles now score and propose across the full universe
 
-Click **Re-convene** in the Chamber, or:
+Available bundles: `etf_core` (~80 ETFs), `dow30`, `nasdaq_top50`, `sp500` (~450 components), `russell2000` (~300 small-caps), `intl_large_cap` (35 international ADRs).
+
+### Step 6 — Convene the oracles
+
+Click **Re-convene** in the Chamber, or run from the CLI:
 
 ```bash
 uv run committee convene
 ```
 
-Each run writes a full audit row to `decisions` — inputs, all six oracle scores, all proposals.
+Each run writes a full audit row to `decisions` — inputs, all six oracle scores, all proposals. Switch between oracle tabs in **Trades** to compare proposals side by side. Use the **Portfolio** page to see how each oracle scores your individual holdings and where each sleeve drifts from that oracle's target allocation.
+
+### Step 7 — Explore scenarios (optional)
+
+Replay a historical or hypothetical shock against your current portfolio. All six oracles re-score deterministically under the scenario's price and macro overrides:
+
+```bash
+uv run committee scenario list
+uv run committee scenario run gfc_2008
+```
+
+Scenario packs live in `scenarios/` as YAML files. No market dynamics are simulated — shocks are hardcoded overrides applied to the existing data model.
 
 ---
 
@@ -137,19 +169,6 @@ The **Quality Compounder** implements the Novy-Marx quality factor: gross profit
 | `intl_large_cap` | ~35 international ADRs (UK, Europe, Asia-Pacific, Canada, India) |
 
 Custom bundles: add a YAML file to `bundles/` following the existing format, then `committee universe enable <name>`.
-
----
-
-## Scenario analysis
-
-Replay a historical or hypothetical shock against your current portfolio. All six oracles re-score deterministically under the scenario's price and macro overrides.
-
-```bash
-uv run committee scenario list
-uv run committee scenario run gfc_2008
-```
-
-Scenario packs live in `scenarios/` as YAML files. No market dynamics are simulated — shocks are hardcoded overrides applied to the existing data model.
 
 ---
 

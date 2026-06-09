@@ -62,4 +62,6 @@ logs/
 *.jpeg
 *.gif
 *.webp
+# Keep README screenshots committed
+!docs/screenshots/*.png
 .worktrees/
