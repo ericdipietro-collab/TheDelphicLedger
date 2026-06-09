@@ -7,6 +7,14 @@ import {
 import { api, BundleInfo, OracleCard, ChamberResponse, DissentRow, RivalObjection, SetupStatus } from '../api'
 import { ORACLE_IDS, ORACLE_COLOR, ORACLE_DISPLAY, fmtScore, fmtPct, scoreColor, DIRECTION_COLOR } from '../constants'
 
+function daysAgo(isoDate: string): string {
+  const ms = Date.now() - new Date(isoDate).getTime()
+  const days = Math.floor(ms / 86_400_000)
+  if (days === 0) return 'today'
+  if (days === 1) return '1 day ago'
+  return `${days} days ago`
+}
+
 // ── Per-oracle identity metadata ──────────────────────────────────────────────
 
 const ORACLE_ICON = {
@@ -807,6 +815,19 @@ export function Chamber() {
             run {data.run_id.slice(0, 8)}… &middot; {new Date(data.run_at).toLocaleString()}
             {data.scenario_id && <span className="ml-2 text-violet-400">scenario: {data.scenario_id}</span>}
           </p>
+          {setupStatus && (setupStatus.prices_as_of || setupStatus.edgar_as_of) && (
+            <p className="text-xs text-slate-600 font-mono mt-0.5">
+              {setupStatus.prices_as_of && (
+                <span>Prices: {daysAgo(setupStatus.prices_as_of)}</span>
+              )}
+              {setupStatus.prices_as_of && setupStatus.edgar_as_of && (
+                <span className="mx-2">·</span>
+              )}
+              {setupStatus.edgar_as_of && (
+                <span>EDGAR: {daysAgo(setupStatus.edgar_as_of)}</span>
+              )}
+            </p>
+          )}
         </div>
         {/* Data refresh + convene controls */}
         <div className="flex items-center gap-2 flex-wrap">
