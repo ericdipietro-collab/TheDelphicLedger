@@ -1640,6 +1640,7 @@ def backtest(
     db: Path = _DB_PATH_OPT,
     date_from: str = typer.Option("", "--from", help="Start date YYYY-MM-DD (default: 1 year ago)"),
     date_to: str = typer.Option("", "--to", help="End date YYYY-MM-DD (default: today)"),
+    as_of: str | None = typer.Option(None, "--as-of", help="Cap observations to ≤ this ISO date YYYY-MM-DD"),
     perturb: bool = typer.Option(False, "--perturb", help="Include ±50% drift-parameter perturbation report"),
 ) -> None:
     """Point-in-time regime-tilt backtest vs. Passive Pragmatist benchmark.
@@ -1660,6 +1661,7 @@ def backtest(
     try:
         d_from = _date.fromisoformat(date_from) if date_from else today.replace(year=today.year - 1)
         d_to = _date.fromisoformat(date_to) if date_to else today
+        d_as_of = _date.fromisoformat(as_of) if as_of else None
     except ValueError as e:
         console.print(f"[red]Invalid date format: {e}[/red]")
         raise typer.Exit(1) from None
@@ -1669,10 +1671,12 @@ def backtest(
     session = next(gen)
     try:
         console.print(f"\n[bold]Committee backtest[/bold]  {d_from} → {d_to}")
+        if d_as_of is not None:
+            console.print(f"[dim]as-of cutoff: {d_as_of}[/dim]")
         console.print("[dim]Benchmark: Passive Pragmatist (neutral allocation)[/dim]")
         console.print("[dim]Tilt: Macro Tactician (regime-driven)[/dim]\n")
 
-        report = run_backtest(session, d_from, d_to, perturb=perturb)
+        report = run_backtest(session, d_from, d_to, perturb=perturb, as_of=d_as_of)
 
         if report.note:
             console.print(f"[yellow]Note: {report.note.replace('_', ' ')}[/yellow]")
@@ -1691,6 +1695,7 @@ def backtest(
         tbl.add_column("Max DD", justify="right")
         tbl.add_column("Ulcer", justify="right")
         tbl.add_column("Switches", justify="right")
+        tbl.add_column("Response Lag (days)", justify="right")
 
         for m in (report.benchmark_metrics, report.tilt_metrics):
             if m.oracle_id == "passive_pragmatist":
@@ -1710,6 +1715,7 @@ def backtest(
                 _fmt(m.max_drawdown, pct=False) if m.max_drawdown is not None else "n/a",
                 f"{m.ulcer_index:.3f}" if m.ulcer_index is not None else "n/a",
                 str(m.switch_count) if m.oracle_id == "macro_tactician" else "—",
+                str(m.response_lag) if m.response_lag is not None else "n/a",
             )
         console.print(tbl)
 

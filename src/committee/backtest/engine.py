@@ -53,6 +53,7 @@ class BacktestMetrics:
     annualized_turnover: float | None
     implied_tax_drag: float | None
     switch_count: int = 0            # regime tilt changes (Macro Tactician only)
+    response_lag: int | None = None  # median trading days from signal to confirmed tilt change
 
     @property
     def has_data(self) -> bool:
@@ -95,14 +96,15 @@ def _compute_metrics(
     values: list[float],
     switch_count: int = 0,
     turnover_per_period: float | None = None,
+    response_lag: int | None = None,
 ) -> BacktestMetrics:
     """Derive CAGR, max drawdown, and Ulcer index from a value time series."""
     if len(values) < 2 or values[0] == 0:
-        return BacktestMetrics(oracle_id, None, None, None, None, None, switch_count)
+        return BacktestMetrics(oracle_id, None, None, None, None, None, switch_count, response_lag)
 
     years = (dates[-1] - dates[0]).days / 365.25
     if years < 0.08:  # less than ~1 month
-        return BacktestMetrics(oracle_id, None, None, None, None, None, switch_count)
+        return BacktestMetrics(oracle_id, None, None, None, None, None, switch_count, response_lag)
 
     cagr = (values[-1] / values[0]) ** (1.0 / years) - 1.0
 
@@ -135,6 +137,7 @@ def _compute_metrics(
         annualized_turnover=ann_turnover,
         implied_tax_drag=tax_drag,
         switch_count=switch_count,
+        response_lag=response_lag,
     )
 
 
@@ -339,6 +342,7 @@ def run_backtest(
     date_to: date,
     perturb: bool = False,
     drift_abs: float = 0.05,
+    as_of: date | None = None,
 ) -> BacktestReport:
     """Run the sleeve-level tilt-vs-benchmark backtest.
 
@@ -352,10 +356,14 @@ def run_backtest(
         date_to: Last replay date.
         perturb: If True, include a ±50% drift_abs perturbation report.
         drift_abs: Base drift threshold (used for turnover estimation only).
+        as_of: When set, observations are filtered to ≤ as_of (caps date_to).
 
     Returns:
         BacktestReport with metrics, pass-bar result, and optional perturbation.
     """
+    # Cap date_to to as_of when provided — PIT discipline for caller-specified cutoff
+    if as_of is not None and date_to > as_of:
+        date_to = as_of
     dates = _monthly_dates(date_from, date_to)
     if len(dates) < 2:
         return BacktestReport(
@@ -398,12 +406,23 @@ def run_backtest(
     tilt_rebalance_count = 0
     periods_counted = 0
 
+    # Response-lag tracking: measure days from first pending_tilt appearance to confirmed change
+    lag_samples: list[int] = []
+    pending_start: date | None = None
+
     for i in range(1, len(dates)):
         d1, d2 = dates[i - 1], dates[i]
         sleeve_rets = _sleeve_returns(holdings, price_index, d1, d2)
 
         # Macro Tactician weights at d1 (PIT)
         macro_out, fsm_out = run_macro_tactician_pit(macro_config, session, pit_date=d1, fsm_state=fsm_carry)
+
+        # Track when a new pending_tilt first appears (FSM building confirmation)
+        if fsm_out.pending_tilt is not None and pending_start is None:
+            pending_start = d1
+        elif fsm_out.pending_tilt is None:
+            pending_start = None  # pending was abandoned or confirmed
+
         fsm_carry = RegimeFSMInput(
             composite_score=0.0,
             credit_spread_veto=False,
@@ -413,6 +432,10 @@ def run_backtest(
         )
         if fsm_out.tilt != prev_tilt:
             switch_count += 1
+            # Record lag from when pending first appeared to now (tilt confirmed)
+            if pending_start is not None:
+                lag_samples.append((d1 - pending_start).days)
+                pending_start = None
         prev_tilt = fsm_out.tilt
 
         tilt_weights = {k: float(v) for k, v in macro_out.sleeve_targets.items()}
@@ -453,8 +476,20 @@ def run_backtest(
     bench_to = periods_counted / max(years, 0.01) if periods_counted > 0 else None
     tilt_to = periods_counted / max(years, 0.01) if periods_counted > 0 else None
 
+    # Compute median response lag (None when no tilt changes occurred)
+    computed_lag: int | None = None
+    if lag_samples:
+        sorted_lags = sorted(lag_samples)
+        mid = len(sorted_lags) // 2
+        if len(sorted_lags) % 2 == 1:
+            computed_lag = sorted_lags[mid]
+        else:
+            computed_lag = (sorted_lags[mid - 1] + sorted_lags[mid]) // 2
+
     bench_metrics = _compute_metrics("passive_pragmatist", valid_dates, bench_values, 0, bench_to)
-    tilt_metrics = _compute_metrics("macro_tactician", valid_dates, tilt_values, switch_count, tilt_to)
+    tilt_metrics = _compute_metrics(
+        "macro_tactician", valid_dates, tilt_values, switch_count, tilt_to, computed_lag
+    )
 
     pass_bar = _evaluate_pass_bar(tilt_metrics, bench_metrics, years)
 
