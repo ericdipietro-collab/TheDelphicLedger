@@ -281,19 +281,28 @@ def fetch_macro(session: SessionDep) -> RefreshResult:
 
 @router.post("/fetch-edgar", response_model=RefreshResult)
 def fetch_edgar(session: SessionDep) -> RefreshResult:
-    """Fetch annual XBRL fundamentals from SEC EDGAR for all equity holdings."""
+    """Fetch annual XBRL fundamentals from SEC EDGAR for held stocks + universe stocks."""
     from committee.market.edgar import fetch_all_edgar
     from committee.market.persist import save_fundamentals
 
-    instruments: list[Instrument] = session.execute(
+    held: list[Instrument] = session.execute(
         select(Instrument)
         .join(Holding, Holding.instrument_id == Instrument.id)
         .where(Instrument.instrument_type == "stock")
         .distinct()
     ).scalars().all()
 
+    universe: list[Instrument] = session.execute(
+        select(Instrument)
+        .join(UniverseEntry, UniverseEntry.instrument_id == Instrument.id)
+        .where(Instrument.instrument_type == "stock")
+        .distinct()
+    ).scalars().all()
+
+    instruments: list[Instrument] = list({i.id: i for i in [*held, *universe]}.values())
+
     if not instruments:
-        return RefreshResult(ok=False, message="No stock holdings to fetch fundamentals for.", count=0)
+        return RefreshResult(ok=False, message="No stock instruments to fetch fundamentals for.", count=0)
 
     pairs = [(i.ticker, i.id) for i in instruments if i.ticker]
     results = fetch_all_edgar(pairs)
@@ -325,7 +334,7 @@ def fetch_edgar(session: SessionDep) -> RefreshResult:
 
     session.commit()
 
-    parts: list[str] = [f"Fetched {total} new fundamental observations for {len(pairs)} instruments."]
+    parts: list[str] = [f"Fetched {total} new fundamental observations for {len(pairs)} instruments ({len(held)} held, {len(universe)} universe)."]
     if unavailable:
         parts.append(f"No EDGAR data: {', '.join(unavailable)} (ETF/foreign/OTC — normal).")
     if errors:
@@ -1402,6 +1411,52 @@ _BUNDLES: dict[str, dict] = {
             ("WNC",   "stock", "equity", "equity_us", "Wabash National Corp."),
             ("WRLD",  "stock", "equity", "equity_us", "World Acceptance Corp."),
             ("WSC",   "stock", "equity", "equity_us", "WillScot Mobile Mini Holdings Corp."),
+        ],
+    },
+    "intl_large_cap": {
+        "display_name": "Intl Large Cap (~35 international ADRs)",
+        "instruments": [
+            # Europe — UK
+            ("AZN",  "stock", "equity", "equity_intl", "AstraZeneca PLC"),
+            ("BP",   "stock", "equity", "equity_intl", "BP PLC"),
+            ("SHEL", "stock", "equity", "equity_intl", "Shell PLC"),
+            ("GSK",  "stock", "equity", "equity_intl", "GSK plc"),
+            ("UL",   "stock", "equity", "equity_intl", "Unilever PLC"),
+            ("BTI",  "stock", "equity", "equity_intl", "British American Tobacco PLC"),
+            ("DEO",  "stock", "equity", "equity_intl", "Diageo PLC"),
+            ("HSBC", "stock", "equity", "equity_intl", "HSBC Holdings PLC"),
+            ("BCS",  "stock", "equity", "equity_intl", "Barclays PLC"),
+            # Europe — Continental
+            ("ASML", "stock", "equity", "equity_intl", "ASML Holding NV"),
+            ("ING",  "stock", "equity", "equity_intl", "ING Groep NV"),
+            ("NVS",  "stock", "equity", "equity_intl", "Novartis AG"),
+            ("ABB",  "stock", "equity", "equity_intl", "ABB Ltd"),
+            ("SAP",  "stock", "equity", "equity_intl", "SAP SE"),
+            ("SAN",  "stock", "equity", "equity_intl", "Banco Santander SA"),
+            ("TTE",  "stock", "equity", "equity_intl", "TotalEnergies SE"),
+            ("E",    "stock", "equity", "equity_intl", "Eni SpA"),
+            # Asia-Pacific — Japan
+            ("TM",   "stock", "equity", "equity_intl", "Toyota Motor Corp"),
+            ("SONY", "stock", "equity", "equity_intl", "Sony Group Corp"),
+            ("HMC",  "stock", "equity", "equity_intl", "Honda Motor Co"),
+            ("MFG",  "stock", "equity", "equity_intl", "Mizuho Financial Group"),
+            # Asia-Pacific — Other
+            ("TSM",  "stock", "equity", "equity_intl", "Taiwan Semiconductor Mfg Co"),
+            ("BHP",  "stock", "equity", "equity_intl", "BHP Group Limited"),
+            ("RIO",  "stock", "equity", "equity_intl", "Rio Tinto PLC"),
+            # Canada
+            ("TD",   "stock", "equity", "equity_intl", "Toronto-Dominion Bank"),
+            ("RY",   "stock", "equity", "equity_intl", "Royal Bank of Canada"),
+            ("ENB",  "stock", "equity", "equity_intl", "Enbridge Inc"),
+            ("BAM",  "stock", "equity", "equity_intl", "Brookfield Asset Management"),
+            ("CNI",  "stock", "equity", "equity_intl", "Canadian National Railway"),
+            ("CP",   "stock", "equity", "equity_intl", "Canadian Pacific Kansas City"),
+            ("BPZZF","stock", "equity", "equity_intl", "Boston Pizza Royalties Income Fund"),
+            # India
+            ("HDB",  "stock", "equity", "equity_intl", "HDFC Bank Ltd"),
+            ("IBN",  "stock", "equity", "equity_intl", "ICICI Bank Ltd"),
+            ("INFY", "stock", "equity", "equity_intl", "Infosys Ltd"),
+            ("WIT",  "stock", "equity", "equity_intl", "Wipro Ltd"),
         ],
     },
 }

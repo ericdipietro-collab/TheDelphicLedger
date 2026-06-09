@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   ShieldCheck, Rocket, Banknote, Globe, Cpu, LayoutGrid,
-  AlertTriangle, RefreshCw, TrendingUp, BarChart2, FileText, Tag, Boxes, Info,
+  AlertTriangle, RefreshCw, TrendingUp, Info,
   CheckCircle2, Circle, ArrowRight,
 } from 'lucide-react'
 import { api, BundleInfo, OracleCard, ChamberResponse, DissentRow, RivalObjection, SetupStatus, RunSummary } from '../api'
@@ -13,6 +13,183 @@ function daysAgo(isoDate: string): string {
   if (days === 0) return 'today'
   if (days === 1) return '1 day ago'
   return `${days} days ago`
+}
+
+function stalenessInfo(isoDate: string | null | undefined): { text: string; cls: string } {
+  if (!isoDate) return { text: 'never', cls: 'text-slate-600' }
+  const days = Math.floor((Date.now() - new Date(isoDate).getTime()) / 86_400_000)
+  if (days === 0) return { text: 'today', cls: 'text-emerald-500' }
+  if (days === 1) return { text: '1 day ago', cls: 'text-slate-400' }
+  if (days <= 7) return { text: `${days} days ago`, cls: 'text-slate-400' }
+  if (days <= 60) return { text: `${days} days ago`, cls: 'text-amber-500' }
+  return { text: `${days} days ago`, cls: 'text-rose-400' }
+}
+
+// ── Control panel (4-step workflow) ──────────────────────────────────────────
+
+function ControlPanel({
+  bundles, bundleToggling, constraint, profiles, regime, regimeSaving,
+  setupStatus, dataOp, fetchProgressData, convening,
+  onDataOp, onBundleToggle, onConstraintChange, onRegimeChange, onConvene,
+}: {
+  bundles: BundleInfo[]
+  bundleToggling: string | null
+  constraint: string
+  profiles: string[]
+  regime: string
+  regimeSaving: boolean
+  setupStatus: SetupStatus | null
+  dataOp: DataOp
+  fetchProgressData: { current: number; total: number } | null
+  convening: boolean
+  onDataOp: (op: 'prices' | 'macro' | 'edgar' | 'sleeves' | 'bundles') => void
+  onBundleToggle: (id: string, enabled: boolean) => void
+  onConstraintChange: (c: string) => void
+  onRegimeChange: (r: string) => void
+  onConvene: () => void
+}) {
+  const fundsOnly = constraint.toLowerCase().includes('fund')
+  const totalActive = bundles.filter(b => b.enabled).reduce((s, b) => s + b.instrument_count, 0)
+  const prices = stalenessInfo(setupStatus?.prices_as_of)
+  const edgar  = stalenessInfo(setupStatus?.edgar_as_of)
+  const macro  = setupStatus?.has_macro
+    ? { text: 'loaded', cls: 'text-slate-400' }
+    : { text: 'missing', cls: 'text-amber-500' }
+
+  const sec = 'bg-slate-900/80 p-4'
+  const lbl = 'text-[10px] font-mono uppercase tracking-widest text-slate-600'
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-[1fr_210px_140px_110px] gap-px bg-slate-800/60 rounded-xl overflow-hidden border border-slate-800">
+
+      {/* ① Universe */}
+      <div className={sec + ' space-y-2'}>
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <span className={lbl}><span className="text-slate-700 mr-1">①</span>Universe</span>
+          <select
+            value={constraint}
+            onChange={e => onConstraintChange(e.target.value)}
+            disabled={convening}
+            className="bg-slate-800 border border-slate-700 text-slate-300 text-xs rounded-lg px-2 py-1 focus:outline-none font-mono"
+          >
+            {profiles.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+        </div>
+        {fundsOnly && (
+          <p className="text-[10px] text-amber-600/80 italic">Funds-only: only ETF Core affects buy candidates</p>
+        )}
+        <div className="grid grid-cols-2 gap-1">
+          {bundles.map(bundle => {
+            const isToggling = bundleToggling === bundle.id
+            const dimmed = fundsOnly && !bundle.id.includes('etf')
+            return (
+              <button
+                key={bundle.id}
+                onClick={() => onBundleToggle(bundle.id, !bundle.enabled)}
+                disabled={!!bundleToggling || !!dataOp || convening}
+                title={bundle.display_name}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all border text-left ${
+                  bundle.enabled
+                    ? 'bg-indigo-950/60 border-indigo-600/50 text-indigo-300 hover:bg-indigo-950/80'
+                    : 'bg-slate-800/60 border-slate-700/60 text-slate-500 hover:text-slate-300 hover:border-slate-600'
+                } ${dimmed ? 'opacity-40' : ''}`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                  isToggling ? 'animate-pulse bg-indigo-400' :
+                  bundle.enabled ? 'bg-indigo-400' : 'bg-slate-700'
+                }`} />
+                <span className="truncate">{bundle.id.replace(/_/g, ' ')}</span>
+                <span className="ml-auto font-mono opacity-50 text-[10px] flex-shrink-0">{bundle.instrument_count}</span>
+              </button>
+            )
+          })}
+        </div>
+        <div className="flex items-center justify-between pt-1">
+          <span className="text-[10px] text-slate-700 font-mono">{totalActive} instruments active</span>
+          <div className="flex gap-1">
+            <button
+              onClick={() => onDataOp('bundles')}
+              disabled={!!dataOp || convening}
+              title="Seed all bundle instruments into DB"
+              className="text-[10px] px-2 py-0.5 rounded border border-slate-700 text-slate-600 hover:text-slate-400 hover:border-slate-600 transition-colors disabled:opacity-30"
+            >
+              {dataOp === 'bundles' ? 'Seeding…' : 'Seed'}
+            </button>
+            <button
+              onClick={() => onDataOp('sleeves')}
+              disabled={!!dataOp || convening}
+              title="Classify unresolved instruments into sleeves"
+              className="text-[10px] px-2 py-0.5 rounded border border-slate-700 text-slate-600 hover:text-slate-400 hover:border-slate-600 transition-colors disabled:opacity-30"
+            >
+              {dataOp === 'sleeves' ? 'Classifying…' : 'Classify'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ② Refresh data */}
+      <div className={sec + ' space-y-3'}>
+        <span className={lbl + ' block mb-1'}><span className="text-slate-700 mr-1">②</span>Refresh data</span>
+        {(
+          [
+            { label: 'Prices', op: 'prices' as const, stale: prices },
+            { label: 'EDGAR',  op: 'edgar'  as const, stale: edgar  },
+            { label: 'Macro',  op: 'macro'  as const, stale: macro  },
+          ] as const
+        ).map(({ label, op, stale }) => (
+          <div key={op} className="flex items-center gap-2">
+            <span className="text-xs text-slate-600 w-10 flex-shrink-0">{label}</span>
+            <span className={`text-[11px] font-mono flex-1 truncate ${stale.cls}`}>{stale.text}</span>
+            <button
+              onClick={() => onDataOp(op)}
+              disabled={!!dataOp || convening}
+              title={`Refresh ${label}`}
+              className="flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded text-[10px] border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors disabled:opacity-30"
+            >
+              {dataOp === op ? (
+                op === 'prices' && fetchProgressData && fetchProgressData.total > 0
+                  ? <span className="font-mono text-[9px]">{fetchProgressData.current}/{fetchProgressData.total}</span>
+                  : <RefreshCw size={9} className="animate-spin" />
+              ) : (
+                <TrendingUp size={9} />
+              )}
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {/* ③ Regime */}
+      <div className={sec + ' space-y-2'}>
+        <span className={lbl + ' block mb-2'}><span className="text-slate-700 mr-1">③</span>Regime</span>
+        <select
+          value={regime}
+          onChange={e => onRegimeChange(e.target.value)}
+          disabled={convening || regimeSaving}
+          title="Override the macro regime tilt (takes effect on next Re-convene)"
+          className="w-full bg-slate-800 border border-slate-700 text-xs rounded-lg px-2.5 py-2 focus:outline-none font-mono"
+          style={{ color: regime === 'defensive' ? '#f87171' : regime === 'aggressive' ? '#4ade80' : '#94a3b8' }}
+        >
+          <option value="neutral">neutral</option>
+          <option value="aggressive">aggressive</option>
+          <option value="defensive">defensive</option>
+        </select>
+        <p className="text-[10px] text-slate-700">Applied on next convene</p>
+      </div>
+
+      {/* ④ Convene */}
+      <div className={sec + ' flex flex-col justify-center gap-2'}>
+        <span className={lbl + ' mb-1'}><span className="text-slate-700 mr-1">④</span>Run</span>
+        <button
+          onClick={onConvene}
+          disabled={convening || !!dataOp}
+          className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors bg-indigo-600 hover:bg-indigo-500 text-white border border-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <RefreshCw size={13} className={convening ? 'animate-spin' : ''} />
+          {convening ? 'Running…' : 'Re-convene'}
+        </button>
+      </div>
+    </div>
+  )
 }
 
 // ── Per-oracle identity metadata ──────────────────────────────────────────────
@@ -762,6 +939,20 @@ export function Chamber() {
     }
   }
 
+  const handleRegimeChange = async (next: string) => {
+    setRegimeSaving(true)
+    try {
+      const res = await fetch('/api/config/regime', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tilt: next }),
+      })
+      if (res.ok) setRegime(next)
+    } finally {
+      setRegimeSaving(false)
+    }
+  }
+
   const handleConvene = async () => {
     setConvening(true)
     setError(null)
@@ -877,113 +1068,36 @@ export function Chamber() {
             </p>
           )}
         </div>
-        {/* Data refresh + convene controls */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs font-mono">
-            <span className="text-slate-300 font-semibold">{data.oracle_cards.length}</span>
-            <span className="text-slate-600">oracles</span>
-            {abstainCount > 0 && (
-              <>
-                <span className="text-slate-700">·</span>
-                <span className="text-slate-500 font-semibold">{abstainCount}</span>
-                <span className="text-slate-600">abstain</span>
-              </>
-            )}
-          </div>
-          <button
-            onClick={() => handleDataOp('prices')}
-            disabled={!!dataOp || convening}
-            title="Fetch 90-day prices for held instruments"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700 disabled:opacity-40"
-          >
-            <TrendingUp size={13} className={dataOp === 'prices' ? 'animate-pulse' : ''} />
-            {dataOp === 'prices'
-              ? (fetchProgressData && fetchProgressData.total > 0
-                ? `Fetching… ${fetchProgressData.current} / ${fetchProgressData.total}`
-                : 'Fetching…')
-              : 'Fetch prices'}
-          </button>
-          <button
-            onClick={() => handleDataOp('macro')}
-            disabled={!!dataOp || convening}
-            title="Fetch FRED macro series (yield curve, VIX, CPI…)"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700 disabled:opacity-40"
-          >
-            <BarChart2 size={13} className={dataOp === 'macro' ? 'animate-pulse' : ''} />
-            {dataOp === 'macro' ? 'Fetching…' : 'Fetch macro'}
-          </button>
-          <button
-            onClick={() => handleDataOp('edgar')}
-            disabled={!!dataOp || convening}
-            title="Fetch annual fundamentals from SEC EDGAR (P/E, D/E, revenue…)"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700 disabled:opacity-40"
-          >
-            <FileText size={13} className={dataOp === 'edgar' ? 'animate-pulse' : ''} />
-            {dataOp === 'edgar' ? 'Fetching…' : 'Fetch EDGAR'}
-          </button>
-          <button
-            onClick={() => handleDataOp('sleeves')}
-            disabled={!!dataOp || convening}
-            title="Auto-assign equity_us / fixed_income / alternatives sleeves to unclassified instruments"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700 disabled:opacity-40"
-          >
-            <Tag size={13} className={dataOp === 'sleeves' ? 'animate-pulse' : ''} />
-            {dataOp === 'sleeves' ? 'Classifying…' : 'Classify sleeves'}
-          </button>
-          <button
-            onClick={() => handleDataOp('bundles')}
-            disabled={!!dataOp || convening}
-            title="Seed all bundle instruments (ETF Core, Dow 30, Nasdaq Top 50)"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700 disabled:opacity-40"
-          >
-            <Boxes size={13} className={dataOp === 'bundles' ? 'animate-pulse' : ''} />
-            {dataOp === 'bundles' ? 'Seeding…' : 'Seed bundles'}
-          </button>
-          <select
-            value={constraint}
-            onChange={e => setConstraint(e.target.value)}
-            disabled={convening}
-            className="bg-slate-900 border border-slate-700 text-slate-300 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none disabled:opacity-50 font-mono"
-          >
-            {profiles.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
-          <select
-            value={regime}
-            onChange={async e => {
-              const next = e.target.value
-              setRegimeSaving(true)
-              try {
-                const res = await fetch('/api/config/regime', {
-                  method: 'PUT',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ tilt: next }),
-                })
-                if (res.ok) setRegime(next)
-              } finally {
-                setRegimeSaving(false)
-              }
-            }}
-            disabled={convening || regimeSaving}
-            title="Override the macro regime tilt (takes effect on next Re-convene)"
-            className="bg-slate-900 border border-slate-700 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none disabled:opacity-50 font-mono"
-            style={{
-              color: regime === 'defensive' ? '#f87171' : regime === 'aggressive' ? '#4ade80' : '#94a3b8'
-            }}
-          >
-            <option value="neutral">neutral</option>
-            <option value="aggressive">aggressive</option>
-            <option value="defensive">defensive</option>
-          </select>
-          <button
-            onClick={handleConvene}
-            disabled={convening || !!dataOp}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 disabled:opacity-50"
-          >
-            <RefreshCw size={13} className={convening ? 'animate-spin' : ''} />
-            {convening ? 'Convening…' : 'Re-convene'}
-          </button>
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs font-mono">
+          <span className="text-slate-300 font-semibold">{data.oracle_cards.length}</span>
+          <span className="text-slate-600">oracles</span>
+          {abstainCount > 0 && (
+            <>
+              <span className="text-slate-700">·</span>
+              <span className="text-slate-500 font-semibold">{abstainCount}</span>
+              <span className="text-slate-600">abstain</span>
+            </>
+          )}
         </div>
       </div>
+
+      <ControlPanel
+        bundles={bundles}
+        bundleToggling={bundleToggling}
+        constraint={constraint}
+        profiles={profiles}
+        regime={regime}
+        regimeSaving={regimeSaving}
+        setupStatus={setupStatus}
+        dataOp={dataOp}
+        fetchProgressData={fetchProgressData}
+        convening={convening}
+        onDataOp={handleDataOp}
+        onBundleToggle={handleBundleToggle}
+        onConstraintChange={setConstraint}
+        onRegimeChange={handleRegimeChange}
+        onConvene={handleConvene}
+      />
       {error && (
         <div className="px-4 py-2 rounded-lg bg-rose-950/30 border border-rose-900/40 text-xs text-rose-400 font-mono">
           {error}
@@ -993,43 +1107,6 @@ export function Chamber() {
         <div className="px-4 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs text-slate-400 font-mono flex items-center justify-between">
           <span>{dataMsg}</span>
           <button onClick={() => setDataMsg(null)} className="text-slate-600 hover:text-slate-400 ml-4">✕</button>
-        </div>
-      )}
-
-      {/* Bundle toggles */}
-      {bundles.length > 0 && (
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs text-slate-600 font-medium uppercase tracking-wider mr-1">
-            Buy universe
-          </span>
-          {bundles.map(bundle => {
-            const isToggling = bundleToggling === bundle.id
-            return (
-              <button
-                key={bundle.id}
-                onClick={() => handleBundleToggle(bundle.id, !bundle.enabled)}
-                disabled={!!bundleToggling || !!dataOp || convening}
-                title={bundle.display_name}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all border disabled:opacity-50 ${
-                  bundle.enabled
-                    ? 'bg-indigo-950/60 border-indigo-600/50 text-indigo-300 hover:bg-indigo-950/80'
-                    : 'bg-slate-900 border-slate-700 text-slate-500 hover:text-slate-300 hover:border-slate-600'
-                }`}
-              >
-                <span
-                  className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                    isToggling ? 'animate-pulse bg-indigo-400' :
-                    bundle.enabled ? 'bg-indigo-400' : 'bg-slate-700'
-                  }`}
-                />
-                {bundle.id.replace(/_/g, ' ')}
-                <span className="font-mono opacity-60">{bundle.instrument_count}</span>
-              </button>
-            )
-          })}
-          <span className="text-xs text-slate-700 font-mono">
-            {bundles.filter(b => b.enabled).reduce((s, b) => s + b.instrument_count, 0)} instruments active
-          </span>
         </div>
       )}
 
