@@ -16,6 +16,15 @@ export const ORACLE_DISPLAY: Record<string, string> = {
   passive_pragmatist: 'Passive Pragmatist',
 }
 
+export const ORACLE_SHORT: Record<string, string> = {
+  value_purist:       'Value',
+  growth_visionary:   'Growth',
+  yield_harvester:    'Yield',
+  macro_tactician:    'Macro',
+  quant:              'Quant',
+  passive_pragmatist: 'Passive',
+}
+
 export const ORACLE_COLOR: Record<string, string> = {
   value_purist:       '#f59e0b',
   growth_visionary:   '#10b981',

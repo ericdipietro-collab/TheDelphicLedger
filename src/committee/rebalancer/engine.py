@@ -200,7 +200,7 @@ def propose(
             sell_qty = (sell_mv / price).to_integral_value(rounding=ROUND_DOWN)
             if sell_qty < _WHOLE_SHARE:
                 continue
-            actual_mv = sell_qty * price
+            actual_mv = (sell_qty * price).quantize(Decimal("0.01"))
             if actual_mv < params.min_trade_usd:
                 continue
 
@@ -294,7 +294,7 @@ def propose(
             buy_qty = (buy_mv / price).to_integral_value(rounding=ROUND_DOWN)
             if buy_qty < _WHOLE_SHARE:
                 continue
-            actual_mv = buy_qty * price
+            actual_mv = (buy_qty * price).quantize(Decimal("0.01"))
             if actual_mv < params.min_trade_usd:
                 continue
 

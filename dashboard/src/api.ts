@@ -50,6 +50,7 @@ export interface RunSummary {
 
 export interface HoldingScoreOut {
   instrument_id: number
+  ticker: string | null
   score: number | null
   reasons: string[]
 }

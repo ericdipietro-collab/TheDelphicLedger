@@ -63,7 +63,9 @@ function ProposalTable({ oracleProposals }: { oracleProposals: OracleProposals[]
                     <td className="px-4 py-2.5">
                       <span className="font-mono font-medium text-slate-200">{p.ticker ?? `#${p.instrument_id}`}</span>
                       {p.name && <span className="text-slate-500 ml-1.5">{p.name.slice(0, 18)}</span>}
-                      <div className="text-slate-600 mt-0.5">{p.account_id}</div>
+                      {p.account_id && p.account_id !== 'unknown' && (
+                        <div className="text-slate-600 mt-0.5">{p.account_id}</div>
+                      )}
                     </td>
                     <td className="px-3 py-2.5 text-center">
                       <span

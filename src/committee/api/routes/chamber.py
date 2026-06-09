@@ -101,6 +101,7 @@ def _build_chamber(rows: list[Decision], session: Session) -> ChamberResponse:
         top_scores = [
             HoldingScoreOut(
                 instrument_id=iid,
+                ticker=inst_map[iid].ticker if iid in inst_map else None,
                 score=sc,
                 reasons=(scores_raw.get(str(iid)) or {}).get("reasons", []),
             )

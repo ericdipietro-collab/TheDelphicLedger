@@ -186,7 +186,7 @@ function OracleCardView({ card }: { card: OracleCard }) {
                 <div key={hs.instrument_id} className="space-y-0.5">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs text-slate-400 font-mono w-14 flex-shrink-0">
-                      #{hs.instrument_id}
+                      {hs.ticker ?? `#${hs.instrument_id}`}
                     </span>
                     <div className="flex-1 h-1.5 rounded-full bg-slate-950 flex overflow-hidden">
                       <span className="w-1/2 flex justify-end">
@@ -260,12 +260,32 @@ function isSplitRow(cells: DissentRow['cells']): boolean {
 
 function DissentMatrix({ rows, oracleAbstained }: { rows: DissentRow[]; oracleAbstained: Set<string> }) {
   const oracles = ORACLE_IDS
+  const [filter, setFilter] = useState<'all' | 'splits'>('splits')
 
   if (rows.length === 0) {
     return <p className="text-slate-600 text-sm">No oracle scores yet — run Re-convene to populate.</p>
   }
 
+  const splitCount = rows.filter(r => isSplitRow(r.cells)).length
+  const filtered = filter === 'splits' ? rows.filter(r => isSplitRow(r.cells)) : rows
+
   return (
+    <div>
+      <div className="flex items-center gap-2 mb-3 text-xs">
+        {(['splits', 'all'] as const).map(f => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={`px-3 py-1 rounded-full border transition-colors ${
+              filter === f
+                ? 'bg-slate-700 border-slate-600 text-slate-100'
+                : 'bg-transparent border-slate-800 text-slate-500 hover:border-slate-600 hover:text-slate-400'
+            }`}
+          >
+            {f === 'splits' ? `Splits (${splitCount})` : `All (${rows.length})`}
+          </button>
+        ))}
+      </div>
     <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900">
       <table className="w-full text-xs border-collapse">
         <thead>
@@ -311,13 +331,13 @@ function DissentMatrix({ rows, oracleAbstained }: { rows: DissentRow[]; oracleAb
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, ri) => {
+          {filtered.map((row, ri) => {
             const split = isSplitRow(row.cells)
             return (
               <tr
                 key={row.instrument_id}
                 className={`hover:bg-slate-800/30 transition-colors ${
-                  ri < rows.length - 1 ? 'border-b border-slate-800/60' : ''
+                  ri < filtered.length - 1 ? 'border-b border-slate-800/60' : ''
                 } ${split ? 'bg-rose-950/20' : ''}`}
               >
                 <td
@@ -380,6 +400,7 @@ function DissentMatrix({ rows, oracleAbstained }: { rows: DissentRow[]; oracleAb
           })}
         </tbody>
       </table>
+    </div>
     </div>
   )
 }

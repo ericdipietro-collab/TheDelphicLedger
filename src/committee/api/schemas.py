@@ -28,6 +28,7 @@ class RunSummary(BaseModel):
 
 class HoldingScoreOut(BaseModel):
     instrument_id: int
+    ticker: str | None = None
     score: float | None
     reasons: list[str]
 

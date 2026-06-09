@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, ReferenceLine } from 'recharts'
 import { AlertTriangle, Wallet } from 'lucide-react'
 import { api, PortfolioResponse } from '../api'
-import { ORACLE_IDS, ORACLE_COLOR, ORACLE_DISPLAY, SLEEVE_COLORS, SLEEVE_LABELS, fmtMoney, fmtPct, fmtScore, scoreColor } from '../constants'
+import { ORACLE_IDS, ORACLE_COLOR, ORACLE_DISPLAY, ORACLE_SHORT, SLEEVE_COLORS, SLEEVE_LABELS, fmtMoney, fmtPct, fmtScore, scoreColor } from '../constants'
 
 export function Portfolio() {
   const [oracle, setOracle] = useState('value_purist')
@@ -170,7 +170,7 @@ export function Portfolio() {
                   <th className="text-right px-4 py-3 text-slate-500 font-medium">Market Value</th>
                   {ORACLE_IDS.map(oid => (
                     <th key={oid} className="text-center px-2 py-3 text-slate-600 font-medium w-16" style={{ color: ORACLE_COLOR[oid] + '99' }}>
-                      {ORACLE_DISPLAY[oid]?.split(' ')[0]?.slice(0, 6)}
+                      {ORACLE_SHORT[oid] ?? ORACLE_DISPLAY[oid]}
                     </th>
                   ))}
                   <th className="text-center px-3 py-3 text-slate-500 font-medium">8-K</th>
