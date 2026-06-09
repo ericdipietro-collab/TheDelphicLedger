@@ -160,8 +160,21 @@ export function Resolve() {
         <div className="grid grid-cols-[200px_1fr] gap-4">
           {/* Queue list */}
           <div className="rounded-xl border border-slate-800 bg-slate-900/50 overflow-hidden">
-            <div className="px-3 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider border-b border-slate-800">
-              Queue
+            <div className="px-3 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider border-b border-slate-800 flex items-center justify-between">
+              <span>Queue</span>
+              {items.length > 1 && (
+                <button
+                  onClick={() => {
+                    setItems([])
+                    setActiveId(null)
+                    resetPanel()
+                    setDoneMsg(`Skipped ${items.length} items — they'll reappear on next load.`)
+                  }}
+                  className="text-slate-600 hover:text-slate-400 text-xs font-normal normal-case tracking-normal"
+                >
+                  Skip all
+                </button>
+              )}
             </div>
             {items.map(item => (
               <button

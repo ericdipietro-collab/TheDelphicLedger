@@ -50,3 +50,15 @@ def test_preclean_no_preheader() -> None:
     headers, data = preclean(rows)
     assert headers[0] == "Symbol"
     assert len(data) == 1
+
+
+def test_positions_total_is_junk() -> None:
+    assert is_junk_row(["Positions Total", "", ""])
+
+
+def test_positions_total_with_values_is_junk() -> None:
+    assert is_junk_row(["Positions Total", "0.00", "$47,832.00", "$47,832.00", "", "", ""])
+
+
+def test_cash_equivalents_total_is_junk() -> None:
+    assert is_junk_row(["Cash & Cash Equivalents", "0.00", "$13,581.00"])

@@ -38,6 +38,28 @@ function ProposalTable({ oracleProposals }: { oracleProposals: OracleProposals[]
         })}
       </div>
 
+      {/* Totals line for active oracle */}
+      {current && current.proposals.length > 0 && (() => {
+        const sells = current.proposals
+          .filter(p => p.direction === 'sell')
+          .reduce((s, p) => s + Math.abs(parseFloat(p.estimated_value ?? '0')), 0)
+        const buys = current.proposals
+          .filter(p => p.direction === 'buy' && p.ticker !== 'CASH')
+          .reduce((s, p) => s + Math.abs(parseFloat(p.estimated_value ?? '0')), 0)
+        if (sells === 0 && buys === 0) return null
+        return (
+          <div className="flex items-center gap-3 mb-3 text-xs font-mono">
+            {sells > 0 && (
+              <span className="text-rose-400">−{fmtMoney(String(sells))} sells</span>
+            )}
+            {sells > 0 && buys > 0 && <span className="text-slate-700">·</span>}
+            {buys > 0 && (
+              <span className="text-emerald-400">+{fmtMoney(String(buys))} buys</span>
+            )}
+          </div>
+        )
+      })()}
+
       {/* Proposals table */}
       {!current || current.proposals.length === 0 ? (
         <p className="text-slate-600 text-sm py-6 text-center">No proposals for this oracle.</p>
@@ -50,13 +72,35 @@ function ProposalTable({ oracleProposals }: { oracleProposals: OracleProposals[]
                 <th className="text-center px-3 py-3 text-slate-500 font-medium">Direction</th>
                 <th className="text-right px-3 py-3 text-slate-500 font-medium">Qty</th>
                 <th className="text-right px-4 py-3 text-slate-500 font-medium">Est. Value</th>
-                <th className="text-right px-3 py-3 text-slate-500 font-medium">Score</th>
+                <th className="text-right px-3 py-3 text-slate-500 font-medium">
+                  <span
+                    className="cursor-help underline decoration-dotted decoration-slate-700"
+                    title="Scores: −1.0 (strong sell) to +1.0 (strong buy). |score| < 0.3 = neutral."
+                  >
+                    Score
+                  </span>
+                </th>
                 <th className="text-left px-3 py-3 text-slate-500 font-medium">Tags</th>
                 <th className="text-left px-4 py-3 text-slate-500 font-medium">Tax Note</th>
               </tr>
             </thead>
             <tbody>
               {current.proposals.map((p, i) => {
+                const isCash = p.ticker === 'CASH' || (p.name ?? '').toLowerCase().includes('cash equivalent')
+                if (isCash) {
+                  return (
+                    <tr key={i} className="border-b border-slate-800/50 hover:bg-slate-800/30">
+                      <td colSpan={7} className="px-4 py-2.5">
+                        <span className="italic text-slate-400 text-xs">
+                          Route {fmtMoney(p.estimated_value)} to cash sleeve
+                        </span>
+                        {p.account_id && p.account_id !== 'unknown' && (
+                          <span className="text-slate-600 text-xs ml-2">({p.account_id})</span>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                }
                 const dirColor = DIRECTION_COLOR[p.direction] ?? '#64748b'
                 return (
                   <tr key={i} className="border-b border-slate-800/50 hover:bg-slate-800/30">

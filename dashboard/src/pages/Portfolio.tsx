@@ -150,7 +150,27 @@ export function Portfolio() {
               />
             </BarChart>
           </ResponsiveContainer>
-          <p className="text-xs text-slate-600 mt-2">Red = outside 5% abs band</p>
+          {(() => {
+                const outside = data.drift_gauges.filter(g => g.outside_band)
+                if (outside.length === 0) {
+                  return <p className="text-xs text-slate-600 mt-2">All sleeves within band.</p>
+                }
+                return (
+                  <div className="mt-2 space-y-0.5">
+                    {outside.map(g => {
+                      const pts = Math.abs(g.drift_abs * 100).toFixed(1)
+                      const over = g.drift_abs > 0
+                      return (
+                        <p key={g.sleeve} className="text-xs text-amber-400/80">
+                          <span className="font-medium">{SLEEVE_LABELS[g.sleeve] ?? g.sleeve}</span>
+                          {' '}is {pts} pts {over ? 'over' : 'under'} target —{' '}
+                          {over ? 'sells' : 'buys'} proposed
+                        </p>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
         </div>
       </div>
 

@@ -243,6 +243,15 @@ export interface SetupStatus {
   bundles_enabled: number
   universe_size: number
   has_run: boolean
+  unresolved_count: number
+  prices_as_of: string | null
+  edgar_as_of: string | null
+}
+
+export interface FetchProgress {
+  operation: string | null
+  current: number
+  total: number
 }
 
 export interface RecomputeRequest {
@@ -267,6 +276,7 @@ export const api = {
   getScenario: (pack_id: string) => get<ScenarioResult>(`/scenarios/${pack_id}`),
   getRecon: () => get<ReconResponse>('/recon'),
   getSetupStatus: () => get<SetupStatus>('/data/setup-status'),
+  fetchProgress: () => get<FetchProgress>('/data/fetch-progress'),
   getConfig: () => get<ConfigResponse>('/config'),
   getBundles: () => get<BundleInfo[]>('/config/bundles'),
   setBundleEnabled: (id: string, enabled: boolean) =>

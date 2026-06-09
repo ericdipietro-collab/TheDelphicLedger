@@ -7,6 +7,8 @@ import re
 _JUNK_PATTERNS = [
     re.compile(r"^\s*$"),                          # blank row
     re.compile(r"account\s+total", re.IGNORECASE),
+    re.compile(r"positions\s+total", re.IGNORECASE),    # Schwab summary row
+    re.compile(r"cash\s+&\s+cash\s+equivalents\b", re.IGNORECASE),  # Schwab cash subtotal
     re.compile(r"^\s*total\b", re.IGNORECASE),
     re.compile(r"^\s*grand\s+total", re.IGNORECASE),
     re.compile(r"brokerage\s+services", re.IGNORECASE),

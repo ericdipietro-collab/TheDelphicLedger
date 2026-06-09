@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from datetime import date, timedelta
 from typing import Annotated
 
@@ -15,6 +16,9 @@ from committee.models import BundleState, Holding, Instrument, MarketObservation
 
 router = APIRouter(prefix="/api/data", tags=["data"])
 SessionDep = Annotated[Session, Depends(get_session)]
+
+_progress_lock = threading.Lock()
+_fetch_progress: dict[str, object] = {"operation": None, "current": 0, "total": 0}
 
 
 class RefreshResult(BaseModel):
@@ -36,12 +40,15 @@ class SetupStatus(BaseModel):
     bundles_enabled: int
     universe_size: int
     has_run: bool
+    unresolved_count: int          # NEW
+    prices_as_of: date | None      # NEW
+    edgar_as_of: date | None       # NEW
 
 
 @router.get("/setup-status", response_model=SetupStatus)
 def setup_status(session: SessionDep) -> SetupStatus:
     """Return a snapshot of which setup steps have been completed."""
-    from committee.models import Fundamental
+    from committee.models import Fundamental, UnresolvedQueue
 
     holding_count: int = session.execute(
         select(func.count()).select_from(Holding).where(Holding.market_value.isnot(None))
@@ -74,11 +81,25 @@ def setup_status(session: SessionDep) -> SetupStatus:
         select(func.count()).select_from(UniverseEntry)
     ).scalar_one() or 0
 
-    # Check if any convene run exists
     from committee.models import Decision
     has_run = (session.execute(
         select(func.count()).select_from(Decision)
     ).scalar_one() or 0) > 0
+
+    unresolved_count: int = session.execute(
+        select(func.count()).select_from(UnresolvedQueue)
+        .where(UnresolvedQueue.queue_type == "instrument")
+        .where(UnresolvedQueue.resolved_at.is_(None))
+    ).scalar_one() or 0
+
+    prices_as_of: date | None = session.execute(
+        select(func.max(MarketObservation.observed_date))
+        .where(MarketObservation.unit == "USD_adj_close")
+    ).scalar_one()
+
+    edgar_as_of: date | None = session.execute(
+        select(func.max(Fundamental.filed_at))
+    ).scalar_one()
 
     return SetupStatus(
         has_holdings=holding_count > 0,
@@ -91,7 +112,27 @@ def setup_status(session: SessionDep) -> SetupStatus:
         bundles_enabled=bundles_enabled,
         universe_size=universe_size,
         has_run=has_run,
+        unresolved_count=unresolved_count,
+        prices_as_of=prices_as_of,
+        edgar_as_of=edgar_as_of,
     )
+
+
+class FetchProgress(BaseModel):
+    operation: str | None
+    current: int
+    total: int
+
+
+@router.get("/fetch-progress", response_model=FetchProgress)
+def fetch_progress_endpoint() -> FetchProgress:
+    """Return current fetch operation progress. Polls every second from the UI."""
+    with _progress_lock:
+        return FetchProgress(
+            operation=_fetch_progress["operation"],  # type: ignore[arg-type]
+            current=int(_fetch_progress["current"]),
+            total=int(_fetch_progress["total"]),
+        )
 
 
 # ── Fetch prices ──────────────────────────────────────────────────────────────
@@ -152,8 +193,14 @@ def fetch_prices(session: SessionDep) -> RefreshResult:
         ).all()
     )
 
+    to_fetch = [i for i in all_insts if i.ticker and i.id not in fresh_iids]
+
+    with _progress_lock:
+        _fetch_progress.update({"operation": "prices", "current": 0, "total": len(to_fetch)})
+
     total = 0
     skipped = 0
+    fetched_n = 0
     errors: list[str] = []
     unavailable: list[str] = []
     for inst in all_insts:
@@ -162,6 +209,9 @@ def fetch_prices(session: SessionDep) -> RefreshResult:
         if inst.id in fresh_iids:
             skipped += 1
             continue
+        fetched_n += 1
+        with _progress_lock:
+            _fetch_progress["current"] = fetched_n
         try:
             obs = adapter.fetch_eod(inst.ticker, start, end)
             n = save_price_observations(
@@ -179,6 +229,9 @@ def fetch_prices(session: SessionDep) -> RefreshResult:
                 unavailable.append(inst.ticker)
             else:
                 errors.append(f"{inst.ticker}: {e}")
+
+    with _progress_lock:
+        _fetch_progress.update({"operation": None, "current": 0, "total": 0})
 
     session.commit()
 
@@ -228,19 +281,28 @@ def fetch_macro(session: SessionDep) -> RefreshResult:
 
 @router.post("/fetch-edgar", response_model=RefreshResult)
 def fetch_edgar(session: SessionDep) -> RefreshResult:
-    """Fetch annual XBRL fundamentals from SEC EDGAR for all equity holdings."""
+    """Fetch annual XBRL fundamentals from SEC EDGAR for held stocks + universe stocks."""
     from committee.market.edgar import fetch_all_edgar
     from committee.market.persist import save_fundamentals
 
-    instruments: list[Instrument] = session.execute(
+    held: list[Instrument] = session.execute(
         select(Instrument)
         .join(Holding, Holding.instrument_id == Instrument.id)
         .where(Instrument.instrument_type == "stock")
         .distinct()
     ).scalars().all()
 
+    universe: list[Instrument] = session.execute(
+        select(Instrument)
+        .join(UniverseEntry, UniverseEntry.instrument_id == Instrument.id)
+        .where(Instrument.instrument_type == "stock")
+        .distinct()
+    ).scalars().all()
+
+    instruments: list[Instrument] = list({i.id: i for i in [*held, *universe]}.values())
+
     if not instruments:
-        return RefreshResult(ok=False, message="No stock holdings to fetch fundamentals for.", count=0)
+        return RefreshResult(ok=False, message="No stock instruments to fetch fundamentals for.", count=0)
 
     pairs = [(i.ticker, i.id) for i in instruments if i.ticker]
     results = fetch_all_edgar(pairs)
@@ -272,7 +334,7 @@ def fetch_edgar(session: SessionDep) -> RefreshResult:
 
     session.commit()
 
-    parts: list[str] = [f"Fetched {total} new fundamental observations for {len(pairs)} instruments."]
+    parts: list[str] = [f"Fetched {total} new fundamental observations for {len(pairs)} instruments ({len(held)} held, {len(universe)} universe)."]
     if unavailable:
         parts.append(f"No EDGAR data: {', '.join(unavailable)} (ETF/foreign/OTC — normal).")
     if errors:
@@ -342,9 +404,43 @@ _TICKER_OVERRIDES: dict[str, tuple[str, str, str]] = {
     "SGOV": ("etf", "fixed_income", "fixed_income"),
     "VGIT": ("etf", "fixed_income", "fixed_income"),
     "TLT":  ("etf", "fixed_income", "fixed_income"),
-    # International stocks (F-suffix OTC or known foreign)
-    "BPZZF":("stock", "equity", "equity_intl"),
-    "RIO":  ("stock", "equity", "equity_intl"),
+    # International stocks — exchange-listed ADRs and direct listings
+    "ASML": ("stock", "equity", "equity_intl"),  # Netherlands
+    "NVS":  ("stock", "equity", "equity_intl"),  # Switzerland
+    "ABB":  ("stock", "equity", "equity_intl"),  # Switzerland
+    "AZN":  ("stock", "equity", "equity_intl"),  # UK/Sweden
+    "GSK":  ("stock", "equity", "equity_intl"),  # UK
+    "UL":   ("stock", "equity", "equity_intl"),  # UK/Netherlands
+    "BTI":  ("stock", "equity", "equity_intl"),  # UK
+    "DEO":  ("stock", "equity", "equity_intl"),  # UK
+    "BP":   ("stock", "equity", "equity_intl"),  # UK
+    "SHEL": ("stock", "equity", "equity_intl"),  # UK/Netherlands
+    "BCS":  ("stock", "equity", "equity_intl"),  # UK
+    "HSBC": ("stock", "equity", "equity_intl"),  # UK/HK
+    "SAP":  ("stock", "equity", "equity_intl"),  # Germany
+    "ING":  ("stock", "equity", "equity_intl"),  # Netherlands
+    "SAN":  ("stock", "equity", "equity_intl"),  # Spain
+    "TTE":  ("stock", "equity", "equity_intl"),  # France
+    "E":    ("stock", "equity", "equity_intl"),  # Italy
+    "TSM":  ("stock", "equity", "equity_intl"),  # Taiwan
+    "TM":   ("stock", "equity", "equity_intl"),  # Japan
+    "SONY": ("stock", "equity", "equity_intl"),  # Japan
+    "HMC":  ("stock", "equity", "equity_intl"),  # Japan
+    "MFG":  ("stock", "equity", "equity_intl"),  # Japan
+    "BHP":  ("stock", "equity", "equity_intl"),  # Australia
+    "RIO":  ("stock", "equity", "equity_intl"),  # Australia/UK
+    "TD":   ("stock", "equity", "equity_intl"),  # Canada
+    "RY":   ("stock", "equity", "equity_intl"),  # Canada
+    "ENB":  ("stock", "equity", "equity_intl"),  # Canada
+    "BAM":  ("stock", "equity", "equity_intl"),  # Canada
+    "CNI":  ("stock", "equity", "equity_intl"),  # Canada
+    "CP":   ("stock", "equity", "equity_intl"),  # Canada
+    "HDB":  ("stock", "equity", "equity_intl"),  # India
+    "IBN":  ("stock", "equity", "equity_intl"),  # India
+    "INFY": ("stock", "equity", "equity_intl"),  # India
+    "WIT":  ("stock", "equity", "equity_intl"),  # India
+    # International stocks — OTC F-suffix (also caught by heuristic)
+    "BPZZF":("stock", "equity", "equity_intl"),  # Canada
 }
 
 # OTC foreign tickers end in F (e.g. BPZZF, NESOF, RYDAF)
@@ -1315,6 +1411,52 @@ _BUNDLES: dict[str, dict] = {
             ("WNC",   "stock", "equity", "equity_us", "Wabash National Corp."),
             ("WRLD",  "stock", "equity", "equity_us", "World Acceptance Corp."),
             ("WSC",   "stock", "equity", "equity_us", "WillScot Mobile Mini Holdings Corp."),
+        ],
+    },
+    "intl_large_cap": {
+        "display_name": "Intl Large Cap (~35 international ADRs)",
+        "instruments": [
+            # Europe — UK
+            ("AZN",  "stock", "equity", "equity_intl", "AstraZeneca PLC"),
+            ("BP",   "stock", "equity", "equity_intl", "BP PLC"),
+            ("SHEL", "stock", "equity", "equity_intl", "Shell PLC"),
+            ("GSK",  "stock", "equity", "equity_intl", "GSK plc"),
+            ("UL",   "stock", "equity", "equity_intl", "Unilever PLC"),
+            ("BTI",  "stock", "equity", "equity_intl", "British American Tobacco PLC"),
+            ("DEO",  "stock", "equity", "equity_intl", "Diageo PLC"),
+            ("HSBC", "stock", "equity", "equity_intl", "HSBC Holdings PLC"),
+            ("BCS",  "stock", "equity", "equity_intl", "Barclays PLC"),
+            # Europe — Continental
+            ("ASML", "stock", "equity", "equity_intl", "ASML Holding NV"),
+            ("ING",  "stock", "equity", "equity_intl", "ING Groep NV"),
+            ("NVS",  "stock", "equity", "equity_intl", "Novartis AG"),
+            ("ABB",  "stock", "equity", "equity_intl", "ABB Ltd"),
+            ("SAP",  "stock", "equity", "equity_intl", "SAP SE"),
+            ("SAN",  "stock", "equity", "equity_intl", "Banco Santander SA"),
+            ("TTE",  "stock", "equity", "equity_intl", "TotalEnergies SE"),
+            ("E",    "stock", "equity", "equity_intl", "Eni SpA"),
+            # Asia-Pacific — Japan
+            ("TM",   "stock", "equity", "equity_intl", "Toyota Motor Corp"),
+            ("SONY", "stock", "equity", "equity_intl", "Sony Group Corp"),
+            ("HMC",  "stock", "equity", "equity_intl", "Honda Motor Co"),
+            ("MFG",  "stock", "equity", "equity_intl", "Mizuho Financial Group"),
+            # Asia-Pacific — Other
+            ("TSM",  "stock", "equity", "equity_intl", "Taiwan Semiconductor Mfg Co"),
+            ("BHP",  "stock", "equity", "equity_intl", "BHP Group Limited"),
+            ("RIO",  "stock", "equity", "equity_intl", "Rio Tinto PLC"),
+            # Canada
+            ("TD",   "stock", "equity", "equity_intl", "Toronto-Dominion Bank"),
+            ("RY",   "stock", "equity", "equity_intl", "Royal Bank of Canada"),
+            ("ENB",  "stock", "equity", "equity_intl", "Enbridge Inc"),
+            ("BAM",  "stock", "equity", "equity_intl", "Brookfield Asset Management"),
+            ("CNI",  "stock", "equity", "equity_intl", "Canadian National Railway"),
+            ("CP",   "stock", "equity", "equity_intl", "Canadian Pacific Kansas City"),
+            ("BPZZF","stock", "equity", "equity_intl", "Boston Pizza Royalties Income Fund"),
+            # India
+            ("HDB",  "stock", "equity", "equity_intl", "HDFC Bank Ltd"),
+            ("IBN",  "stock", "equity", "equity_intl", "ICICI Bank Ltd"),
+            ("INFY", "stock", "equity", "equity_intl", "Infosys Ltd"),
+            ("WIT",  "stock", "equity", "equity_intl", "Wipro Ltd"),
         ],
     },
 }
