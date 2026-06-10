@@ -1780,154 +1780,22 @@ def demo(
     import threading
     import time
     import webbrowser
-    from datetime import date, datetime
-    from decimal import Decimal
 
     import requests as _requests
-    from sqlalchemy import select
 
     from committee.api.deps import init_engine
     from committee.db import get_session, init_db
-    from committee.models import (
-        Account,
-        Holding,
-        ImportBatch,
-        Instrument,
-        MarketObservation,
-        PositionSnapshot,
-    )
+    from committee.demo_data import seed_demo_db
 
     db.parent.mkdir(parents=True, exist_ok=True)
     init_db(db)
 
-    INSTRUMENTS = [
-        dict(ticker="VTSAX", name="Vanguard Total Stock Market Index Fund Admiral Shares",
-             instrument_type="mutual_fund", sleeve="equity_us", is_cash_equivalent=False),
-        dict(ticker="VTIAX", name="Vanguard Total International Stock Index Fund Admiral Shares",
-             instrument_type="mutual_fund", sleeve="equity_intl", is_cash_equivalent=False),
-        dict(ticker="VBTLX", name="Vanguard Total Bond Market Index Fund Admiral Shares",
-             instrument_type="mutual_fund", sleeve="fixed_income", is_cash_equivalent=False),
-        dict(ticker="VMFXX", name="Vanguard Federal Money Market Fund",
-             instrument_type="mutual_fund", sleeve="cash", is_cash_equivalent=True),
-        dict(ticker="VFIFX", name="Vanguard Target Retirement 2050 Fund",
-             instrument_type="mutual_fund", sleeve="alternatives", is_cash_equivalent=False),
-    ]
-
-    HOLDINGS = [
-        dict(ticker="VTSAX", qty=Decimal("500"), market_value=Decimal("73800")),
-        dict(ticker="VTIAX", qty=Decimal("200"), market_value=Decimal("12800")),
-        dict(ticker="VBTLX", qty=Decimal("100"), market_value=Decimal("4600")),
-        dict(ticker="VMFXX", qty=Decimal("2900"), market_value=Decimal("2900")),
-        dict(ticker="VFIFX", qty=Decimal("300"), market_value=Decimal("7400")),
-    ]
-
-    MARKET_DATA = [
-        dict(series_id="T10Y3M", observed_date=date(2024, 12, 31), value=Decimal("0.25")),
-        dict(series_id="BAMLH0A0HYM2", observed_date=date(2024, 12, 31), value=Decimal("3.10")),
-        dict(series_id="BAMLH0A0HYM2", observed_date=date(2024, 11, 30), value=Decimal("3.05")),
-        dict(series_id="VIXCLS", observed_date=date(2024, 12, 31), value=Decimal("17.5")),
-        dict(series_id="UNRATE", observed_date=date(2024, 12, 31), value=Decimal("4.1")),
-    ]
-
     console.print("[bold]Seeding demo database...[/bold]")
 
     for session in get_session():
-        # ImportBatch — required FK for PositionSnapshot
-        batch = session.execute(
-            select(ImportBatch).where(ImportBatch.file_hash == "demo-synthetic-v1")
-        ).scalar_one_or_none()
-        if not batch:
-            batch = ImportBatch(
-                file_hash="demo-synthetic-v1",
-                original_filename="demo_synthetic.csv",
-                file_type="positions",
-                row_count=5,
-                imported_at=datetime(2024, 12, 31),
-            )
-            session.add(batch)
-            session.flush()
+        seed_demo_db(session)
 
-        # Instruments
-        ticker_to_id: dict[str, int] = {}
-        for d in INSTRUMENTS:
-            inst = session.execute(
-                select(Instrument).where(Instrument.ticker == d["ticker"])
-            ).scalar_one_or_none()
-            if not inst:
-                inst = Instrument(
-                    ticker=d["ticker"],
-                    name=d["name"],
-                    instrument_type=d["instrument_type"],
-                    sleeve=d["sleeve"],
-                    is_cash_equivalent=d["is_cash_equivalent"],
-                    needs_unwind=False,
-                    aliases=[],
-                    bundle_tags=[],
-                )
-                session.add(inst)
-                session.flush()
-            ticker_to_id[d["ticker"]] = inst.id
-
-        # Account
-        acct = session.execute(
-            select(Account).where(Account.account_key == "DEMO_VANGUARD")
-        ).scalar_one_or_none()
-        if not acct:
-            acct = Account(account_key="DEMO_VANGUARD", broker="vanguard",
-                           tax_type="taxable", label="Vanguard Brokerage (Demo)")
-            session.add(acct)
-            session.flush()
-
-        # PositionSnapshots + Holdings
-        as_of = date(2024, 12, 31)
-        for h in HOLDINGS:
-            inst_id = ticker_to_id[h["ticker"]]
-            snap = session.execute(
-                select(PositionSnapshot).where(
-                    PositionSnapshot.batch_id == batch.id,
-                    PositionSnapshot.instrument_id == inst_id,
-                )
-            ).scalar_one_or_none()
-            if not snap:
-                session.add(PositionSnapshot(
-                    batch_id=batch.id,
-                    account_id=str(acct.id),
-                    instrument_id=inst_id,
-                    raw_instrument=h["ticker"],
-                    as_of=as_of,
-                    qty=h["qty"],
-                    market_value=h["market_value"],
-                ))
-            holding = session.execute(
-                select(Holding).where(Holding.instrument_id == inst_id)
-            ).scalar_one_or_none()
-            if not holding:
-                session.add(Holding(
-                    instrument_id=inst_id,
-                    account_id=str(acct.id),
-                    qty=h["qty"],
-                    market_value=h["market_value"],
-                    as_of=as_of,
-                ))
-
-        # Market observations
-        for obs in MARKET_DATA:
-            existing = session.execute(
-                select(MarketObservation).where(
-                    MarketObservation.series_id == obs["series_id"],
-                    MarketObservation.observed_date == obs["observed_date"],
-                )
-            ).scalar_one_or_none()
-            if not existing:
-                session.add(MarketObservation(
-                    source="fred",
-                    series_id=obs["series_id"],
-                    observed_date=obs["observed_date"],
-                    value=obs["value"],
-                    degraded=False,
-                ))
-
-    console.print("[green]OK[/green] Instruments, holdings, and market data seeded")
+    console.print("[green]OK[/green] Demo portfolio seeded (stocks, ETFs, prices, fundamentals, macro)")
 
     # Run convene non-interactively
     console.print("[bold]Running committee convene...[/bold]")
