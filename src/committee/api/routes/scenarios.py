@@ -30,7 +30,10 @@ _SLEEVES = ["equity_us", "equity_intl", "fixed_income", "alternatives", "cash"]
 
 
 def _load_pack_yaml(pack_id: str) -> dict:
-    path = _SCENARIOS_DIR / f"{pack_id}.yaml"
+    base = _SCENARIOS_DIR.resolve()
+    path = (base / f"{pack_id}.yaml").resolve()
+    if not path.is_relative_to(base):
+        raise HTTPException(status_code=400, detail="Invalid scenario ID.")
     if not path.exists():
         raise HTTPException(status_code=404, detail=f"Pack {pack_id!r} not found.")
     return yaml.safe_load(path.read_text(encoding="utf-8"))

@@ -30,7 +30,10 @@ class ConstraintProfile:
 
 
 def load_constraint_profile(profile_id: str) -> ConstraintProfile:
-    path = _CONSTRAINTS_DIR / f"{profile_id}.yaml"
+    base = _CONSTRAINTS_DIR.resolve()
+    path = (base / f"{profile_id}.yaml").resolve()
+    if not path.is_relative_to(base):
+        raise FileNotFoundError(f"Constraint profile not found: {profile_id!r}")
     if not path.exists():
         raise FileNotFoundError(f"Constraint profile not found: {path}")
     data = yaml.safe_load(path.read_text(encoding="utf-8"))

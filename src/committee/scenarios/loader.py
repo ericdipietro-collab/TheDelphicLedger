@@ -28,7 +28,10 @@ def load_pack(
     scenarios_dir: Path = _DEFAULT_SCENARIOS_DIR,
 ) -> ScenarioPack:
     """Load a scenario pack by ID. Raises FileNotFoundError if the pack does not exist."""
-    path = scenarios_dir / f"{pack_id}.yaml"
+    base = scenarios_dir.resolve()
+    path = (base / f"{pack_id}.yaml").resolve()
+    if not path.is_relative_to(base):
+        raise FileNotFoundError(f"Scenario pack '{pack_id!r}' not found.")
     if not path.exists():
         raise FileNotFoundError(
             f"Scenario pack '{pack_id}' not found at {path}. "
